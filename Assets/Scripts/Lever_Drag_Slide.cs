@@ -21,7 +21,7 @@ public class MyLever : MonoBehaviour
     [Header("Light Control")]
     public Light controlledLight;
     public float activationThreshold = 5f;
-    
+
     private float targetRotation = -90f;
     public float centerRotation = -90f;
     public float minRotation = -135f;
@@ -210,6 +210,7 @@ public class MyLever : MonoBehaviour
 
             if (myCollider != null && myCollider.bounds.IntersectRay(ray))
             {
+                Debug.Log($"Lever '{gameObject.name}': Started dragging");
                 dragging = true;
                 lastMouseY = inputPosition.y;
                 lastMouseX = inputPosition.x;
@@ -218,6 +219,10 @@ public class MyLever : MonoBehaviour
 
                 // Capture current slide position when starting drag
                 targetSlidePosition = transform.localPosition.x;
+            }
+            else
+            {
+                Debug.Log($"Lever '{gameObject.name}': Ray MISSED collider. Collider: {myCollider != null}, Bounds: {(myCollider != null ? myCollider.bounds.ToString() : "NULL")}");
             }
         }
 
@@ -335,6 +340,7 @@ public class MyLever : MonoBehaviour
 
     void OnDrawGizmos()
     {
+        // Draw lever collider
         Collider col = GetComponent<Collider>();
         if (col != null)
         {
