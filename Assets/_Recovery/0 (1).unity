@@ -346,7 +346,7 @@ GameObject:
   - component: {fileID: 139751568}
   - component: {fileID: 139751567}
   m_Layer: 5
-  m_Name: ScoreCanvas
+  m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -496,8 +496,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e80841efbabe498e9c4e3bb889174c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  carousel: {fileID: 629782073}
-  scoreText: {fileID: 538767117}
+  carousel: {fileID: 0}
 --- !u!4 &174371257
 Transform:
   m_ObjectHideFlags: 0
@@ -940,23 +939,6 @@ MonoBehaviour:
     This is your induction to Melanie Industries!!!
 
     +-------------+'
-  - '+-------------+
-
-    I think your first task is to pull the lever 5 times??!
-
-    +-------------+'
-  - '+-------------+
-
-    Or at least that''s what I thought ?!
-
-    +-------------+'
-  - '+-------------+
-
-    We didn''t have time to set up your environment....
-
-    +-------------+'
-  - "+-------------+\nAnyway... Thanks for joining Melanie Industries, the Company
-    that \nCARES\n+-------------+"
   typingSpeed: 20
   zoomThreshold: 0.1
   minZoomWaitTime: 0.5
@@ -1103,7 +1085,7 @@ GameObject:
   - component: {fileID: 478077082}
   - component: {fileID: 478077081}
   m_Layer: 5
-  m_Name: PhoneCanvas
+  m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1353,8 +1335,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -680, y: -180}
-  m_SizeDelta: {x: 1170, y: 50}
+  m_AnchoredPosition: {x: -350, y: -180}
+  m_SizeDelta: {x: 450, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &538767117
 MonoBehaviour:
@@ -1376,7 +1358,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Score: 0'
+  m_text: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: dc36b3fdc14f47ebb36fd484a67e268a, type: 2}
   m_sharedMaterial: {fileID: 2140032, guid: dc36b3fdc14f47ebb36fd484a67e268a, type: 2}
@@ -1529,10 +1511,7 @@ MonoBehaviour:
   centerTolerance: 30
   clickThreshold: 5
   clickCooldown: 0.5
-  swipeZoneColliders:
-  - {fileID: 1241926996}
-  - {fileID: 1261513527}
-  dialObject: {fileID: 740012242}
+  dialObject: {fileID: 1038763440}
 --- !u!4 &629782074
 Transform:
   m_ObjectHideFlags: 0
@@ -1615,7 +1594,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4281478114
-  m_fontColor: {r: 1, g: 0, b: 1, a: 1}
+  m_fontColor: {r: 0.1333333, g: 0.5450981, b: 0.1333333, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1806,7 +1785,7 @@ BoxCollider:
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 0.019999998, y: 0.020000001, z: 0.0016335492}
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0, y: -9.92757e-15, z: -0.0006233612}
 --- !u!1001 &741973714
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2556,7 +2535,7 @@ GameObject:
   - component: {fileID: 1015869336}
   - component: {fileID: 1015869335}
   m_Layer: 5
-  m_Name: MonitorCanvas
+  m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2718,74 +2697,6 @@ MonoBehaviour:
   centerRotation: -90
   minRotation: -135
   maxRotation: 0
---- !u!1 &1090490631
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1090490633}
-  - component: {fileID: 1090490632}
-  - component: {fileID: 1090490634}
-  m_Layer: 0
-  m_Name: InteractionZone
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!65 &1090490632
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1090490631}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4, y: 0, z: 3.5}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!4 &1090490633
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1090490631}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0, y: 0.04903, z: 0.03494}
-  m_LocalScale: {x: 1, y: 5, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1090490634
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1090490631}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6d53a615cf7f04e72a468200254e7a7e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InteractionZone
-  showVisibleBox: 0
-  boxColor: {r: 1, g: 0, b: 0, a: 0.3}
 --- !u!1 &1133773779
 GameObject:
   m_ObjectHideFlags: 0
@@ -2925,142 +2836,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.0031427548, y: 0.0031427527, z: 5.620579e-10}
   m_Center: {x: 1.7462304e-10, y: -0.007, z: 0.00036818997}
---- !u!1 &1241926995
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1241926998}
-  - component: {fileID: 1241926997}
-  - component: {fileID: 1241926996}
-  m_Layer: 0
-  m_Name: TopSwipeZone
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!65 &1241926996
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1241926995}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &1241926997
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1241926995}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c612338b831934b0aa1944ff0cbefb96, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SwipeZone
-  showVisibleBox: 0
-  boxColor: {r: 0, g: 1, b: 0, a: 0.3}
---- !u!4 &1241926998
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1241926995}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0, y: 0, z: 2.37}
-  m_LocalScale: {x: 5, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1261513526
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1261513529}
-  - component: {fileID: 1261513528}
-  - component: {fileID: 1261513527}
-  m_Layer: 0
-  m_Name: BottomSwipeZone
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!65 &1261513527
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1261513526}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &1261513528
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1261513526}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c612338b831934b0aa1944ff0cbefb96, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SwipeZone
-  showVisibleBox: 0
-  boxColor: {r: 0, g: 1, b: 0, a: 0.3}
---- !u!4 &1261513529
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1261513526}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0, y: 0, z: -2.3}
-  m_LocalScale: {x: 5, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &1296390869 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 643e7443251c64bc48cd384f7ba21124, type: 3}
@@ -3320,7 +3095,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 300}
+  m_AnchoredPosition: {x: 0, y: 900}
   m_SizeDelta: {x: 200, y: 200}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1624835526
@@ -4164,6 +3939,3 @@ SceneRoots:
   - {fileID: 1496948271}
   - {fileID: 1038763441}
   - {fileID: 174934382}
-  - {fileID: 1241926998}
-  - {fileID: 1261513529}
-  - {fileID: 1090490633}

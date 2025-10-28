@@ -38,6 +38,9 @@ public class DialRotaryPhone : MonoBehaviour
     private Camera mainCamera;
     private float totalRotationThisDrag = 0f;
     private int selectedDigit = -1;
+    private CircularCarousel carousel;
+    private GameObject myCarouselWrapper;
+    private InteractionZone interactionZone;
 
     void Start()
     {
@@ -49,10 +52,56 @@ public class DialRotaryPhone : MonoBehaviour
         {
             Debug.LogError("DialRotaryPhone: No main camera found!");
         }
+
+        // Find the carousel
+        carousel = FindFirstObjectByType<CircularCarousel>();
+
+        // Find my carousel wrapper by looking for a parent that's in the carousel array
+        if (carousel != null)
+        {
+            myCarouselWrapper = FindMyCarouselWrapper();
+            if (myCarouselWrapper != null)
+            {
+                Debug.Log($"DialRotaryPhone: Found carousel wrapper: {myCarouselWrapper.name}");
+            }
+            else
+            {
+                Debug.LogWarning($"DialRotaryPhone: Could not find carousel wrapper in parent hierarchy!");
+            }
+        }
+
+        // Initially hide phone number text if not centered
+        UpdatePhoneNumberVisibility();
+
+        // Find interaction zone in the scene or parent hierarchy
+        interactionZone = GetComponentInParent<InteractionZone>();
+        if (interactionZone == null)
+        {
+            interactionZone = FindFirstObjectByType<InteractionZone>();
+        }
+
+        if (interactionZone != null)
+        {
+            Debug.Log($"DialRotaryPhone '{gameObject.name}': Found interaction zone: {interactionZone.gameObject.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"DialRotaryPhone '{gameObject.name}': No InteractionZone found - will accept input from anywhere");
+        }
     }
 
     void Update()
     {
+        // Check if GameManager says we shouldn't be processing input
+        if (GameManager.Instance != null && !GameManager.Instance.IsCarouselActive())
+        {
+            // Carousel is not active (e.g., monitor is zoomed in), don't process input
+            return;
+        }
+
+        // Update phone number text visibility based on carousel position
+        UpdatePhoneNumberVisibility();
+
         HandleInput();
 
         // If not dragging, return to original position
@@ -85,6 +134,7 @@ public class DialRotaryPhone : MonoBehaviour
             if (touch.press.wasPressedThisFrame)
             {
                 Vector2 touchPosition = touch.position.ReadValue();
+
                 if (IsTouchingDial(touchPosition))
                 {
                     isDragging = true;
@@ -124,6 +174,7 @@ public class DialRotaryPhone : MonoBehaviour
                 {
                     Vector2 mousePosition = mouse.position.ReadValue();
                     Debug.Log($"*** MOUSE CLICKED at {mousePosition} ***");
+
                     if (IsTouchingDial(mousePosition))
                     {
                         Debug.Log($"*** TOUCHING DIAL - calling GetDigitFromPosition ***");
@@ -155,23 +206,53 @@ public class DialRotaryPhone : MonoBehaviour
 
     bool IsTouchingDial(Vector2 screenPosition)
     {
-        Ray ray = mainCamera.ScreenPointToRay(screenPosition);
-        RaycastHit hit;
-
-        if (Physics.Raycast(ray, out hit))
+        // First check if input is within interaction zone
+        if (interactionZone != null && !interactionZone.IsPositionInZone(screenPosition))
         {
-            // Check if we hit this object or any of its children
-            Transform hitTransform = hit.collider.transform;
-            while (hitTransform != null)
+            Debug.Log($"DialRotaryPhone: Input rejected - outside interaction zone");
+            return false;
+        }
+
+        Ray ray = mainCamera.ScreenPointToRay(screenPosition);
+        RaycastHit[] hits = Physics.RaycastAll(ray, 1000f);
+
+        Debug.Log($"IsTouchingDial: Found {hits.Length} raycast hits");
+
+        // Check ALL objects hit by the ray - looking specifically for number colliders
+        foreach (RaycastHit hit in hits)
+        {
+            // Skip InteractionZone colliders
+            if (hit.collider.GetComponent<InteractionZone>() != null)
             {
-                if (hitTransform == transform)
+                Debug.Log($"  -> Skipping InteractionZone: {hit.collider.gameObject.name}");
+                continue;
+            }
+
+            Debug.Log($"  -> Hit: {hit.collider.gameObject.name}");
+
+            // Check if the hit object's name contains "number" (like "0 number", "1 number", etc)
+            string hitName = hit.collider.gameObject.name.ToLower();
+            if (hitName.Contains("number"))
+            {
+                Debug.Log($"*** DIAL MATCH FOUND! Clicked on number: {hit.collider.gameObject.name} ***");
+                return true;
+            }
+
+            // Also check if we hit a child of this transform that's a number
+            Transform hitTransform = hit.collider.transform;
+            while (hitTransform != null && hitTransform != transform.parent)
+            {
+                string objName = hitTransform.gameObject.name.ToLower();
+                if (objName.Contains("number") && hitTransform.IsChildOf(transform))
                 {
+                    Debug.Log($"*** DIAL MATCH FOUND! Clicked on dial child: {hitTransform.gameObject.name} ***");
                     return true;
                 }
                 hitTransform = hitTransform.parent;
             }
         }
 
+        Debug.Log("IsTouchingDial: No dial match found");
         return false;
     }
 
@@ -209,41 +290,44 @@ public class DialRotaryPhone : MonoBehaviour
     {
         // Raycast to find which number collider was hit
         Ray ray = mainCamera.ScreenPointToRay(screenPosition);
-        RaycastHit hit;
+        RaycastHit[] hits = Physics.RaycastAll(ray, 1000f);
 
-        Debug.Log($"GetDigitFromPosition: Raycasting from {screenPosition}");
+        Debug.Log($"GetDigitFromPosition: Raycasting from {screenPosition}, found {hits.Length} hits");
 
-        if (Physics.Raycast(ray, out hit, 1000f))
+        // Check ALL hits to find a number collider
+        foreach (RaycastHit hit in hits)
         {
-            // Check if the hit object's name contains a digit
-            string hitName = hit.collider.gameObject.name;
-            Debug.Log($"GetDigitFromPosition: Hit object '{hitName}' at distance {hit.distance}");
+            // Skip InteractionZone colliders
+            if (hit.collider.GetComponent<InteractionZone>() != null)
+            {
+                Debug.Log($"GetDigitFromPosition: Skipping InteractionZone: {hit.collider.gameObject.name}");
+                continue;
+            }
+
+            Debug.Log($"GetDigitFromPosition: Checking hit '{hit.collider.gameObject.name}'");
 
             // Check the entire hierarchy for a digit in the name
             Transform current = hit.collider.transform;
             while (current != null)
             {
                 string objName = current.gameObject.name;
-                Debug.Log($"Checking hierarchy: '{objName}'");
+                Debug.Log($"  Checking hierarchy: '{objName}'");
 
                 // Try to parse the digit from the object name
                 for (int i = 0; i <= 9; i++)
                 {
                     if (objName.Contains(i.ToString()))
                     {
-                        Debug.Log($"Found digit: {i} in '{objName}'");
+                        Debug.Log($"*** FOUND DIGIT: {i} in '{objName}' ***");
                         return i;
                     }
                 }
 
                 current = current.parent;
             }
-
-            Debug.Log($"No digit found in hierarchy of '{hitName}'");
-            return -1;
         }
 
-        Debug.Log("GetDigitFromPosition: Raycast hit nothing");
+        Debug.Log("GetDigitFromPosition: No digit found in any hits");
         return -1;
     }
 
@@ -304,5 +388,54 @@ public class DialRotaryPhone : MonoBehaviour
     public string GetPhoneNumber()
     {
         return phoneNumberText != null ? phoneNumberText.text : "";
+    }
+
+    GameObject FindMyCarouselWrapper()
+    {
+        // Walk up the parent hierarchy and check if any parent is in the carousel's object array
+        Transform current = transform.parent;
+        while (current != null)
+        {
+            // Check if this parent is in the carousel's carouselObjects array
+            if (carousel.carouselObjects != null)
+            {
+                foreach (GameObject carouselObj in carousel.carouselObjects)
+                {
+                    if (carouselObj == current.gameObject)
+                    {
+                        return current.gameObject;
+                    }
+                }
+            }
+            current = current.parent;
+        }
+        return null;
+    }
+
+    void UpdatePhoneNumberVisibility()
+    {
+        if (phoneNumberText == null) return;
+
+        // Only show phone number text when this dial's wrapper is centered
+        if (carousel != null && myCarouselWrapper != null)
+        {
+            GameObject centeredObject = carousel.GetCenteredObject();
+            bool isCentered = (centeredObject == myCarouselWrapper);
+
+            // Show or hide the phone number text based on whether we're centered
+            if (phoneNumberText.gameObject.activeSelf != isCentered)
+            {
+                phoneNumberText.gameObject.SetActive(isCentered);
+                Debug.Log($"DialRotaryPhone: Phone number text visibility set to {isCentered}");
+            }
+        }
+        else
+        {
+            // If we can't find the carousel, just show it by default
+            if (!phoneNumberText.gameObject.activeSelf)
+            {
+                phoneNumberText.gameObject.SetActive(true);
+            }
+        }
     }
 }

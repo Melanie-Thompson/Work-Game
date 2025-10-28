@@ -60,7 +60,10 @@ public class ClickableMonitor : MonoBehaviour
     private int currentTextIndex = 0;
     private bool isTypingComplete = false;
     private GameManager gameManager;
-    
+    private InteractionZone interactionZone;
+    private DialRotaryPhone dialRotaryPhone;
+    private MyLever lever;
+
     // Input tracking
     private bool isPressingMouse = false;
     private Vector2 mousePressPosition;
@@ -90,8 +93,15 @@ public class ClickableMonitor : MonoBehaviour
         if (myCollider == null)
         {
             myCollider = gameObject.AddComponent<BoxCollider>();
-            Debug.Log("Added BoxCollider to monitor");
+            Debug.Log($"Monitor '{gameObject.name}': Added BoxCollider");
         }
+        else
+        {
+            Debug.Log($"Monitor '{gameObject.name}': Already has collider of type {myCollider.GetType().Name}, enabled: {myCollider.enabled}");
+        }
+
+        // Log collider details
+        Debug.Log($"Monitor '{gameObject.name}': Collider bounds: {myCollider.bounds}, isTrigger: {myCollider.isTrigger}");
         
         // Save original camera state
         originalOrthographicSize = mainCamera.orthographicSize;
@@ -122,6 +132,43 @@ public class ClickableMonitor : MonoBehaviour
         Debug.Log($"Monitor '{gameObject.name}' initialized.");
         Debug.Log($"Original camera pos: {originalCameraPosition}");
         Debug.Log($"Zoomed camera pos: {zoomedCameraPosition}");
+
+        // Find interaction zone in the scene or parent hierarchy
+        interactionZone = GetComponentInParent<InteractionZone>();
+        if (interactionZone == null)
+        {
+            interactionZone = FindFirstObjectByType<InteractionZone>();
+        }
+
+        if (interactionZone != null)
+        {
+            Debug.Log($"Monitor '{gameObject.name}': Found interaction zone: {interactionZone.gameObject.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"Monitor '{gameObject.name}': No InteractionZone found - will accept input from anywhere");
+        }
+
+        // Find dial and lever in parent hierarchy
+        dialRotaryPhone = GetComponentInParent<DialRotaryPhone>();
+        if (dialRotaryPhone == null)
+        {
+            dialRotaryPhone = transform.parent?.GetComponentInChildren<DialRotaryPhone>();
+        }
+        if (dialRotaryPhone != null)
+        {
+            Debug.Log($"Monitor '{gameObject.name}': Found DialRotaryPhone: {dialRotaryPhone.gameObject.name}");
+        }
+
+        lever = GetComponentInParent<MyLever>();
+        if (lever == null)
+        {
+            lever = transform.parent?.GetComponentInChildren<MyLever>();
+        }
+        if (lever != null)
+        {
+            Debug.Log($"Monitor '{gameObject.name}': Found MyLever: {lever.gameObject.name}");
+        }
     }
     
     void OnEnable()
@@ -134,6 +181,7 @@ public class ClickableMonitor : MonoBehaviour
         isTypingComplete = false;
         hasStartedTyping = false;
         UpdateUIVisibility();
+        DisableOtherColliders();
     }
     
     void Update()
@@ -170,8 +218,10 @@ public class ClickableMonitor : MonoBehaviour
                 // Track touch press
                 if (touch.press.wasPressedThisFrame)
                 {
+                    Vector2 touchPosition = touch.position.ReadValue();
+
                     isPressingMouse = true;
-                    mousePressPosition = touch.position.ReadValue();
+                    mousePressPosition = touchPosition;
                     Debug.Log($"Monitor: Touch pressed at {mousePressPosition}");
                     touchEventHandled = true;
                 }
@@ -211,8 +261,10 @@ public class ClickableMonitor : MonoBehaviour
                     // Track mouse press
                     if (mouse.leftButton.wasPressedThisFrame)
                     {
+                        Vector2 mousePosition = mouse.position.ReadValue();
+
                         isPressingMouse = true;
-                        mousePressPosition = mouse.position.ReadValue();
+                        mousePressPosition = mousePosition;
                         Debug.Log($"Monitor: Mouse pressed at {mousePressPosition}");
                     }
 
@@ -454,6 +506,82 @@ public class ClickableMonitor : MonoBehaviour
         Debug.Log($"*** Is this the last message? {currentTextIndex} >= {textMessages.Length - 1} = {currentTextIndex >= textMessages.Length - 1}");
     }
     
+    void DisableOtherColliders()
+    {
+        Debug.Log("*** Monitor: Disabling other interactive components ***");
+
+        // Disable InteractionZone collider
+        if (interactionZone != null)
+        {
+            BoxCollider zoneCollider = interactionZone.GetComponent<BoxCollider>();
+            if (zoneCollider != null)
+            {
+                zoneCollider.enabled = false;
+                Debug.Log($"Monitor: Disabled InteractionZone collider on {interactionZone.gameObject.name}");
+            }
+        }
+
+        // Disable the dial COMPONENT AND all its colliders
+        if (dialRotaryPhone != null)
+        {
+            dialRotaryPhone.enabled = false;
+            Debug.Log($"Monitor: Disabled DialRotaryPhone component on {dialRotaryPhone.gameObject.name}");
+
+            // Also disable all colliders on the dial
+            Collider[] dialColliders = dialRotaryPhone.GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in dialColliders)
+            {
+                col.enabled = false;
+                Debug.Log($"Monitor: Disabled dial collider on {col.gameObject.name}");
+            }
+        }
+
+        // Disable the lever COMPONENT (not just colliders)
+        if (lever != null)
+        {
+            lever.enabled = false;
+            Debug.Log($"Monitor: Disabled MyLever component on {lever.gameObject.name}");
+        }
+    }
+
+    void EnableOtherColliders()
+    {
+        Debug.Log("*** Monitor: Re-enabling other interactive components ***");
+
+        // Re-enable InteractionZone collider
+        if (interactionZone != null)
+        {
+            BoxCollider zoneCollider = interactionZone.GetComponent<BoxCollider>();
+            if (zoneCollider != null)
+            {
+                zoneCollider.enabled = true;
+                Debug.Log($"Monitor: Re-enabled InteractionZone collider on {interactionZone.gameObject.name}");
+            }
+        }
+
+        // Re-enable the dial COMPONENT AND all its colliders
+        if (dialRotaryPhone != null)
+        {
+            dialRotaryPhone.enabled = true;
+            Debug.Log($"Monitor: Re-enabled DialRotaryPhone component on {dialRotaryPhone.gameObject.name}");
+
+            // Also re-enable all colliders on the dial
+            Collider[] dialColliders = dialRotaryPhone.GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in dialColliders)
+            {
+                col.enabled = true;
+                Debug.Log($"Monitor: Re-enabled dial collider on {col.gameObject.name}");
+            }
+        }
+
+        // Re-enable the lever COMPONENT
+        if (lever != null)
+        {
+            lever.enabled = true;
+            Debug.Log($"Monitor: Re-enabled MyLever component on {lever.gameObject.name}");
+        }
+    }
+
     void OnDisable()
     {
         // Clean up when disabled
@@ -462,14 +590,17 @@ public class ClickableMonitor : MonoBehaviour
             StopCoroutine(typingCoroutine);
             typingCoroutine = null;
         }
-        
+
         // Reset zoom state
         if (isZoomed)
         {
             isZoomed = false;
             UpdateUIVisibility();
         }
-        
+
+        // Re-enable other colliders
+        EnableOtherColliders();
+
         Debug.Log($"Monitor '{gameObject.name}' disabled");
     }
 }

@@ -14,11 +14,15 @@ public class CircularCarousel : MonoBehaviour
     [Header("Swipe Settings")]
     public float swipeThreshold = 50f;
     public float swipeTimeWindow = 0.3f;
-    
+
     [Header("Interaction Settings")]
     public float centerTolerance = 30f;
     public float clickThreshold = 5f;
     public float clickCooldown = 0.5f;
+
+    [Header("Swipe Detection Colliders")]
+    [Tooltip("Colliders that act as swipe zones (e.g., UI panels with BoxColliders)")]
+    public Collider[] swipeZoneColliders;
 
     [Header("Dial Settings")]
     public GameObject dialObject;  // Assign the dial GameObject to ignore input on it
@@ -114,26 +118,102 @@ public class CircularCarousel : MonoBehaviour
     
     bool IsPositionOnDial(Vector2 screenPosition)
     {
-        if (dialObject == null) return false;
+        if (dialObject == null)
+        {
+            Debug.Log("Carousel: dialObject is NULL - not checking for dial");
+            return false;
+        }
+
+        // Check if the DialRotaryPhone component is enabled - if not, ignore dial checks
+        DialRotaryPhone dialComponent = dialObject.GetComponent<DialRotaryPhone>();
+        if (dialComponent == null)
+        {
+            dialComponent = dialObject.GetComponentInChildren<DialRotaryPhone>();
+        }
+        if (dialComponent != null && !dialComponent.enabled)
+        {
+            Debug.Log($"Carousel: DialRotaryPhone component is DISABLED - not checking for dial");
+            return false;
+        }
 
         Ray ray = Camera.main.ScreenPointToRay(screenPosition);
-        RaycastHit hit;
+        RaycastHit[] hits = Physics.RaycastAll(ray, 1000f);
 
-        if (Physics.Raycast(ray, out hit))
+        Debug.Log($"Carousel: IsPositionOnDial - Raycast found {hits.Length} hits. DialObject = '{dialObject.name}'");
+
+        // Check ALL objects hit by the ray, not just the first one
+        // ONLY match if we hit actual number colliders (not the shell/body)
+        foreach (RaycastHit hit in hits)
         {
-            // Check if we hit the dial object or any of its children
-            Transform hitTransform = hit.collider.transform;
-            while (hitTransform != null)
+            Debug.Log($"  -> Hit: {hit.collider.gameObject.name} (enabled: {hit.collider.enabled}, parent chain: {GetParentChain(hit.collider.transform)})");
+
+            // Skip disabled colliders
+            if (!hit.collider.enabled)
             {
-                if (hitTransform.gameObject == dialObject)
+                Debug.Log($"  -> SKIPPING disabled collider: {hit.collider.gameObject.name}");
+                continue;
+            }
+
+            // ONLY match if the name contains "number" (like "0 number", "1 number", etc.)
+            string hitName = hit.collider.gameObject.name.ToLower();
+            if (hitName.Contains("number"))
+            {
+                // Now check if this number belongs to our dial
+                Transform hitTransform = hit.collider.transform;
+                while (hitTransform != null)
                 {
-                    Debug.Log($"Carousel: Click is on dial object - ignoring input");
-                    return true;
+                    if (hitTransform.gameObject == dialObject || hitTransform == dialObject.transform)
+                    {
+                        Debug.Log($"Carousel: ✓✓✓ MATCH! Click is on dial NUMBER (hit: {hit.collider.gameObject.name}) - ignoring input");
+                        return true;
+                    }
+                    hitTransform = hitTransform.parent;
                 }
-                hitTransform = hitTransform.parent;
             }
         }
 
+        Debug.Log("Carousel: No dial match found - carousel will process input");
+        return false;
+    }
+
+    string GetParentChain(Transform t)
+    {
+        string chain = t.name;
+        Transform parent = t.parent;
+        while (parent != null)
+        {
+            chain += " -> " + parent.name;
+            parent = parent.parent;
+        }
+        return chain;
+    }
+
+    bool IsPositionInSwipeZone(Vector2 screenPosition)
+    {
+        // If no swipe zone colliders are assigned, allow swiping anywhere (legacy behavior)
+        if (swipeZoneColliders == null || swipeZoneColliders.Length == 0)
+        {
+            return true;
+        }
+
+        // Cast a ray from the screen position
+        Ray ray = Camera.main.ScreenPointToRay(screenPosition);
+        RaycastHit hit;
+
+        // Check if we hit any of the swipe zone colliders
+        if (Physics.Raycast(ray, out hit, 1000f))
+        {
+            foreach (Collider swipeZone in swipeZoneColliders)
+            {
+                if (swipeZone != null && hit.collider == swipeZone)
+                {
+                    Debug.Log($"Position {screenPosition} hit swipe zone: {swipeZone.gameObject.name}");
+                    return true;
+                }
+            }
+        }
+
+        Debug.Log($"Position {screenPosition} not in any swipe zone");
         return false;
     }
 
@@ -165,18 +245,29 @@ public class CircularCarousel : MonoBehaviour
             {
                 Vector2 touchPosition = touch.position.ReadValue();
 
-                // Check if touching the dial - if so, ignore this input
+                // FIRST: Check if touching the dial - if so, ignore carousel input completely
                 if (IsPositionOnDial(touchPosition))
                 {
+                    Debug.Log("Carousel: Touch on dial detected - ignoring carousel input");
+                    inputHandled = true; // Mark as handled so we don't continue
                     return;
                 }
 
+                // SECOND: Track touch for swipe or monitor click
                 isDragging = true;
                 isSnapping = false;
                 dragStartPosition = touchPosition;
                 dragStartTime = Time.time;
-                Debug.Log($">>> TOUCH DRAG STARTED at {dragStartPosition}, time: {dragStartTime}");
                 inputHandled = true;
+
+                if (IsPositionInSwipeZone(touchPosition))
+                {
+                    Debug.Log($">>> TOUCH DRAG STARTED in swipe zone at {dragStartPosition}, time: {dragStartTime}");
+                }
+                else
+                {
+                    Debug.Log($">>> TOUCH DRAG STARTED outside swipe zone (possible monitor click) at {dragStartPosition}");
+                }
             }
 
             if (touch.press.wasReleasedThisFrame && isDragging)
@@ -198,17 +289,27 @@ public class CircularCarousel : MonoBehaviour
                 {
                     Vector2 mousePosition = mouse.position.ReadValue();
 
-                    // Check if clicking the dial - if so, ignore this input
+                    // FIRST: Check if clicking the dial - if so, ignore carousel input completely
                     if (IsPositionOnDial(mousePosition))
                     {
+                        Debug.Log("Carousel: Click on dial detected - ignoring carousel input");
                         return;
                     }
 
+                    // SECOND: Check if click started in a valid swipe zone OR just track it for monitor clicks
                     isDragging = true;
                     isSnapping = false;
                     dragStartPosition = mousePosition;
                     dragStartTime = Time.time;
-                    Debug.Log($">>> MOUSE DRAG STARTED at {dragStartPosition}, time: {dragStartTime}");
+
+                    if (IsPositionInSwipeZone(mousePosition))
+                    {
+                        Debug.Log($">>> MOUSE DRAG STARTED in swipe zone at {dragStartPosition}, time: {dragStartTime}");
+                    }
+                    else
+                    {
+                        Debug.Log($">>> MOUSE DRAG STARTED outside swipe zone (possible monitor click) at {dragStartPosition}");
+                    }
                 }
 
                 if (mouse.leftButton.wasReleasedThisFrame && isDragging)
@@ -232,8 +333,12 @@ public class CircularCarousel : MonoBehaviour
         Debug.Log($">>> Swipe threshold: {swipeThreshold}, Time window: {swipeTimeWindow}");
         Debug.Log($">>> Click threshold: {clickThreshold}");
 
+        // Check if this was in a swipe zone
+        bool wasInSwipeZone = IsPositionInSwipeZone(dragStartPosition);
+        Debug.Log($">>> Was drag start in swipe zone? {wasInSwipeZone}");
+
         // Check if it's a swipe
-        if (dragDistance > swipeThreshold && dragTime < swipeTimeWindow)
+        if (dragDistance > swipeThreshold && dragTime < swipeTimeWindow && wasInSwipeZone)
         {
             Debug.Log($"*** SWIPE DETECTED *** - distance: {dragDistance}, time: {dragTime}");
             // SWIPE detected
@@ -275,13 +380,54 @@ public class CircularCarousel : MonoBehaviour
             {
                 // Check if we actually clicked on the centered object
                 Ray ray = Camera.main.ScreenPointToRay(releasePosition);
-                RaycastHit hit;
+                RaycastHit[] hits = Physics.RaycastAll(ray, 1000f);
 
-                if (Physics.Raycast(ray, out hit, 1000f))
+                Debug.Log($"Carousel: RaycastAll found {hits.Length} hits");
+
+                // Log ALL hits first for debugging
+                for (int i = 0; i < hits.Length; i++)
                 {
-                    Debug.Log($"Carousel: Raycast hit {hit.collider.gameObject.name}");
+                    Debug.Log($"  Hit {i}: {hits[i].collider.gameObject.name} (enabled: {hits[i].collider.enabled})");
+                }
 
-                    // Check if hit object belongs to the centered wrapper by walking up hierarchy
+                // Filter through all hits to find the first one that belongs to the centered object
+                // (Skip InteractionZone and other interactive object hits that handle their own input)
+                RaycastHit? validHit = null;
+                foreach (RaycastHit hit in hits)
+                {
+                    Debug.Log($"Carousel: Processing hit on {hit.collider.gameObject.name} (enabled: {hit.collider.enabled})");
+
+                    // Skip disabled colliders
+                    if (!hit.collider.enabled)
+                    {
+                        Debug.Log($"Carousel: Skipping disabled collider: {hit.collider.gameObject.name}");
+                        continue;
+                    }
+
+                    // Skip InteractionZone colliders
+                    if (hit.collider.GetComponent<InteractionZone>() != null)
+                    {
+                        Debug.Log($"Carousel: Skipping InteractionZone hit: {hit.collider.gameObject.name}");
+                        continue;
+                    }
+
+                    // Skip dial/phone colliders (they handle their own input)
+                    if (hit.collider.GetComponent<DialRotaryPhone>() != null ||
+                        hit.collider.GetComponentInParent<DialRotaryPhone>() != null)
+                    {
+                        Debug.Log($"Carousel: Skipping DialRotaryPhone hit: {hit.collider.gameObject.name}");
+                        continue;
+                    }
+
+                    // Skip lever colliders (they handle their own input)
+                    if (hit.collider.GetComponent<MyLever>() != null ||
+                        hit.collider.GetComponentInParent<MyLever>() != null)
+                    {
+                        Debug.Log($"Carousel: Skipping MyLever hit: {hit.collider.gameObject.name}");
+                        continue;
+                    }
+
+                    // Check if this hit belongs to the centered object
                     Transform hitTransform = hit.collider.transform;
                     bool belongsToCenteredObject = false;
 
@@ -290,6 +436,7 @@ public class CircularCarousel : MonoBehaviour
                         if (hitTransform.gameObject == centeredObject)
                         {
                             belongsToCenteredObject = true;
+                            Debug.Log($"Carousel: Hit on {hit.collider.gameObject.name} BELONGS to centered object {centeredObject.name}");
                             break;
                         }
                         hitTransform = hitTransform.parent;
@@ -297,51 +444,58 @@ public class CircularCarousel : MonoBehaviour
 
                     if (belongsToCenteredObject)
                     {
-                        Debug.Log($"Carousel: Click accepted on {centeredObject.name}");
-
-                        // ALWAYS try to get GameManager if null
-                        if (gameManager == null)
-                        {
-                            Debug.LogWarning("Carousel: GameManager was NULL, attempting multiple recovery methods...");
-
-                            // Try Instance first
-                            gameManager = GameManager.Instance;
-
-                            // If still null, try FindFirstObjectByType
-                            if (gameManager == null)
-                            {
-                                gameManager = FindFirstObjectByType<GameManager>();
-                                Debug.Log($"Tried FindFirstObjectByType, result: {(gameManager != null ? "FOUND" : "NULL")}");
-                            }
-
-                            // If still null, try FindAnyObjectByType
-                            if (gameManager == null)
-                            {
-                                gameManager = FindAnyObjectByType<GameManager>();
-                                Debug.Log($"Tried FindAnyObjectByType, result: {(gameManager != null ? "FOUND" : "NULL")}");
-                            }
-                        }
-
-                        if (gameManager == null)
-                        {
-                            Debug.LogError("Carousel: GameManager is NULL even after all recovery attempts! Cannot hand control.");
-                            Debug.LogError("Make sure you have a GameObject with the GameManager script in your scene!");
-                        }
-                        else
-                        {
-                            Debug.Log($"Carousel: GameManager found: {gameManager.gameObject.name}");
-                            Debug.Log("Carousel: Calling GameManager.OnCarouselObjectClicked");
-                            gameManager.OnCarouselObjectClicked(centeredObject);
-                        }
+                        Debug.Log($"Carousel: *** ACCEPTING CLICK on centered object {centeredObject.name} ***");
+                        validHit = hit;
+                        break;
                     }
                     else
                     {
-                        Debug.Log($"Carousel: Click rejected - {hit.collider.gameObject.name} does not belong to centered wrapper {centeredObject.name}");
+                        Debug.Log($"Carousel: Hit on {hit.collider.gameObject.name} does NOT belong to centered object");
+                    }
+                }
+
+                if (validHit.HasValue)
+                {
+                    Debug.Log($"Carousel: Click accepted on {centeredObject.name} (hit: {validHit.Value.collider.gameObject.name})");
+
+                    // ALWAYS try to get GameManager if null
+                    if (gameManager == null)
+                    {
+                        Debug.LogWarning("Carousel: GameManager was NULL, attempting multiple recovery methods...");
+
+                        // Try Instance first
+                        gameManager = GameManager.Instance;
+
+                        // If still null, try FindFirstObjectByType
+                        if (gameManager == null)
+                        {
+                            gameManager = FindFirstObjectByType<GameManager>();
+                            Debug.Log($"Tried FindFirstObjectByType, result: {(gameManager != null ? "FOUND" : "NULL")}");
+                        }
+
+                        // If still null, try FindAnyObjectByType
+                        if (gameManager == null)
+                        {
+                            gameManager = FindAnyObjectByType<GameManager>();
+                            Debug.Log($"Tried FindAnyObjectByType, result: {(gameManager != null ? "FOUND" : "NULL")}");
+                        }
+                    }
+
+                    if (gameManager == null)
+                    {
+                        Debug.LogError("Carousel: GameManager is NULL even after all recovery attempts! Cannot hand control.");
+                        Debug.LogError("Make sure you have a GameObject with the GameManager script in your scene!");
+                    }
+                    else
+                    {
+                        Debug.Log($"Carousel: GameManager found: {gameManager.gameObject.name}");
+                        Debug.Log("Carousel: Calling GameManager.OnCarouselObjectClicked");
+                        gameManager.OnCarouselObjectClicked(centeredObject);
                     }
                 }
                 else
                 {
-                    Debug.Log("Carousel: Raycast hit nothing");
+                    Debug.Log("Carousel: No valid hit found on centered object (after filtering InteractionZones)");
                 }
             }
         }

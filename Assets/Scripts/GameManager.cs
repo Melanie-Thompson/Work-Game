@@ -1,11 +1,13 @@
 using UnityEngine;
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
-    
+
     [Header("References")]
     public CircularCarousel carousel;
+    public TextMeshProUGUI scoreText;
     
     private ClickableMonitor currentActiveMonitor;
     private int score = 0;
@@ -33,13 +35,13 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         Debug.Log("=== GAMEMANAGER START ===");
-        
+
         // Try to find carousel if not assigned
         if (carousel == null)
         {
             carousel = FindFirstObjectByType<CircularCarousel>();
         }
-        
+
         if (carousel != null)
         {
             Debug.Log("GameManager: Found carousel, setting reference");
@@ -49,10 +51,13 @@ public class GameManager : MonoBehaviour
         {
             Debug.LogError("GameManager: Could not find CircularCarousel!");
         }
-        
+
         // Initialize state
         isCarouselActive = true;
         isMonitorActive = false;
+
+        // Initialize score display
+        UpdateScoreDisplay();
     }
     
     public bool IsCarouselActive()
@@ -70,32 +75,45 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log($"=== GAMEMANAGER: OnCarouselObjectClicked called for {clickedObject.name} ===");
         Debug.Log($"State BEFORE: Carousel={isCarouselActive}, Monitor={isMonitorActive}");
-        
+
         // Set global state
         isCarouselActive = false;
         isMonitorActive = true;
-        
+
         // Disable carousel control
         if (carousel != null)
         {
             carousel.DisableCarousel();
         }
-        
+
         // Enable the monitor
         var monitor = clickedObject.GetComponentInChildren<ClickableMonitor>();
         if (monitor != null)
         {
-            Debug.Log($"GameManager: Found monitor, enabling it");
+            Debug.Log($"GameManager: Found monitor '{monitor.gameObject.name}', enabling it now");
             currentActiveMonitor = monitor;
             monitor.SetGameManager(this);
+
+            // Check if already enabled
+            Debug.Log($"GameManager: Monitor enabled state BEFORE: {monitor.enabled}");
             monitor.enabled = true;
-            Debug.Log($"GameManager: Enabled monitor on {clickedObject.name}");
+            Debug.Log($"GameManager: Monitor enabled state AFTER: {monitor.enabled}");
+            Debug.Log($"GameManager: Successfully enabled monitor on {clickedObject.name}");
         }
         else
         {
             Debug.LogError($"GameManager: No ClickableMonitor found on {clickedObject.name} or its children!");
+
+            // Search more thoroughly and log what we find
+            var allChildren = clickedObject.GetComponentsInChildren<Transform>();
+            Debug.LogError($"GameManager: Object has {allChildren.Length} children. Listing components:");
+            foreach (var child in allChildren)
+            {
+                var components = child.GetComponents<Component>();
+                Debug.LogError($"  - {child.name}: {string.Join(", ", System.Array.ConvertAll(components, c => c.GetType().Name))}");
+            }
         }
-        
+
         Debug.Log($"State AFTER: Carousel={isCarouselActive}, Monitor={isMonitorActive}");
     }
     
@@ -136,10 +154,23 @@ public class GameManager : MonoBehaviour
     {
         score += points;
         Debug.Log($"GameManager: Score added! Total score: {score}");
+        UpdateScoreDisplay();
     }
-    
+
     public int GetScore()
     {
         return score;
+    }
+
+    private void UpdateScoreDisplay()
+    {
+        if (scoreText != null)
+        {
+            scoreText.text = $"Score: {score}";
+        }
+        else
+        {
+            Debug.LogWarning("GameManager: scoreText is not assigned!");
+        }
     }
 }

@@ -37,6 +37,7 @@ public class MyLever : MonoBehaviour
     private CircularCarousel carousel;
     private int originalLayer;
     private GameObject myCarouselWrapper;
+    private InteractionZone interactionZone;
 
     void Start()
     {
@@ -80,10 +81,33 @@ public class MyLever : MonoBehaviour
                 Debug.LogWarning($"Lever '{gameObject.name}': Could not find carousel wrapper in parent hierarchy!");
             }
         }
+
+        // Find interaction zone in the scene or parent hierarchy
+        interactionZone = GetComponentInParent<InteractionZone>();
+        if (interactionZone == null)
+        {
+            interactionZone = FindFirstObjectByType<InteractionZone>();
+        }
+
+        if (interactionZone != null)
+        {
+            Debug.Log($"Lever '{gameObject.name}': Found interaction zone: {interactionZone.gameObject.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"Lever '{gameObject.name}': No InteractionZone found - will accept input from anywhere");
+        }
     }
     
     void Update()
     {
+        // Check if GameManager says we shouldn't be processing input
+        if (GameManager.Instance != null && !GameManager.Instance.IsCarouselActive())
+        {
+            // Carousel is not active (e.g., monitor is zoomed in), don't process input
+            return;
+        }
+
         // Only process input if this lever's wrapper is centered
         if (carousel != null && myCarouselWrapper != null)
         {
@@ -175,6 +199,13 @@ public class MyLever : MonoBehaviour
         // Handle input press
         if (inputPressed)
         {
+            // First check if input is within interaction zone
+            if (interactionZone != null && !interactionZone.IsPositionInZone(inputPosition))
+            {
+                Debug.Log($"Lever '{gameObject.name}': Input rejected - outside interaction zone");
+                return;
+            }
+
             Ray ray = mainCamera.ScreenPointToRay(inputPosition);
 
             if (myCollider != null && myCollider.bounds.IntersectRay(ray))
