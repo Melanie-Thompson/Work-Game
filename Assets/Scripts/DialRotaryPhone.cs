@@ -22,6 +22,9 @@ public class DialRotaryPhone : MonoBehaviour
     [Tooltip("GameObject containing the phone icon (will be shown/hidden based on carousel position)")]
     public GameObject phoneIcon;
 
+    [Tooltip("Maximum number of digits (not including the # prefix)")]
+    public int maxDigits = 3;
+
     [Tooltip("Required rotation angle to register a dial (in degrees)")]
     public float requiredRotation = 60f;
 
@@ -74,6 +77,13 @@ public class DialRotaryPhone : MonoBehaviour
             {
                 Debug.LogWarning($"DialRotaryPhone: Could not find carousel wrapper in parent hierarchy!");
             }
+        }
+
+        // Initialize phone number with # prefix
+        if (phoneNumberText != null)
+        {
+            phoneNumberText.text = "#";
+            Debug.Log("DialRotaryPhone: Initialized phone number with # prefix");
         }
 
         // Initially hide phone number text if not centered
@@ -387,6 +397,14 @@ public class DialRotaryPhone : MonoBehaviour
             return;
         }
 
+        // Check if we've already reached max digits (excluding the # prefix)
+        int currentDigitCount = phoneNumberText.text.Length - 1; // Subtract 1 for the #
+        if (currentDigitCount >= maxDigits)
+        {
+            Debug.Log($"DialRotaryPhone: Max digits ({maxDigits}) already reached, ignoring input");
+            return;
+        }
+
         // Append digit to phone number display
         string oldText = phoneNumberText.text;
         phoneNumberText.text += selectedDigit.ToString();
@@ -419,8 +437,8 @@ public class DialRotaryPhone : MonoBehaviour
     {
         if (phoneNumberText != null)
         {
-            phoneNumberText.text = "";
-            Debug.Log("DialRotaryPhone: Phone number cleared");
+            phoneNumberText.text = "#"; // Reset to # prefix
+            Debug.Log("DialRotaryPhone: Phone number cleared and reset to #");
         }
     }
 
@@ -491,7 +509,7 @@ public class DialRotaryPhone : MonoBehaviour
     {
         if (phoneIcon == null) return;
 
-        // Only show phone icon when this dial's wrapper is centered
+        // Only show phone icon when this dial's wrapper is centered AND we have max digits
         if (carousel != null && myCarouselWrapper != null)
         {
             // Don't update visibility while carousel is moving - prevents flickering
@@ -503,8 +521,13 @@ public class DialRotaryPhone : MonoBehaviour
             GameObject centeredObject = carousel.GetCenteredObject();
             bool isCentered = (centeredObject == myCarouselWrapper);
 
-            // Show icon only when centered
-            phoneIcon.SetActive(isCentered);
+            // Check if we have the full phone number (# + maxDigits)
+            int currentDigitCount = phoneNumberText != null ? phoneNumberText.text.Length - 1 : 0;
+            bool hasFullNumber = currentDigitCount >= maxDigits;
+
+            // Show icon only when centered AND has full phone number
+            bool shouldShow = isCentered && hasFullNumber;
+            phoneIcon.SetActive(shouldShow);
         }
         else
         {
