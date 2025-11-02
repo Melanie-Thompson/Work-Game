@@ -19,6 +19,9 @@ public class DialRotaryPhone : MonoBehaviour
     [Tooltip("TextMeshPro component to display the phone number")]
     public TMP_Text phoneNumberText;
 
+    [Tooltip("GameObject containing the phone icon (will be shown/hidden based on carousel position)")]
+    public GameObject phoneIcon;
+
     [Tooltip("Required rotation angle to register a dial (in degrees)")]
     public float requiredRotation = 60f;
 
@@ -95,6 +98,17 @@ public class DialRotaryPhone : MonoBehaviour
 
     void Update()
     {
+        // Check if work shift is complete - if so, block ALL input
+        if (GameManager.Instance != null && GameManager.Instance.IsWorkShiftComplete())
+        {
+            if (isDragging)
+            {
+                isDragging = false;
+                IsDialActive = false;
+            }
+            return;
+        }
+
         // Check if GameManager says we shouldn't be processing input
         if (GameManager.Instance != null && !GameManager.Instance.IsCarouselActive())
         {
@@ -104,6 +118,9 @@ public class DialRotaryPhone : MonoBehaviour
 
         // Update phone number text visibility based on carousel position
         UpdatePhoneNumberVisibility();
+
+        // Update phone icon visibility based on carousel position
+        UpdatePhoneIconVisibility();
 
         HandleInput();
 
@@ -467,6 +484,32 @@ public class DialRotaryPhone : MonoBehaviour
                 phoneNumberText.gameObject.SetActive(true);
                 lastCenteredState = true;
             }
+        }
+    }
+
+    void UpdatePhoneIconVisibility()
+    {
+        if (phoneIcon == null) return;
+
+        // Only show phone icon when this dial's wrapper is centered
+        if (carousel != null && myCarouselWrapper != null)
+        {
+            // Don't update visibility while carousel is moving - prevents flickering
+            if (carousel.IsCarouselMoving())
+            {
+                return;
+            }
+
+            GameObject centeredObject = carousel.GetCenteredObject();
+            bool isCentered = (centeredObject == myCarouselWrapper);
+
+            // Show icon only when centered
+            phoneIcon.SetActive(isCentered);
+        }
+        else
+        {
+            // If we can't find the carousel, hide by default
+            phoneIcon.SetActive(false);
         }
     }
 }

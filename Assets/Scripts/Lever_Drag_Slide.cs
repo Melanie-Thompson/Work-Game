@@ -5,6 +5,11 @@ public enum ScoringDirection { Up, Down, Both }
 
 public class MyLever : MonoBehaviour
 {
+    // Static flag to tell other scripts (like carousel) that a lever is being dragged
+    public static bool IsAnyLeverActive { get; private set; } = false;
+    private static float lastLeverReleaseTime = -999f;
+    public static float LeverCooldown = 0.3f; // Cooldown after lever release
+
     public float rotationSpeed = 1f;
     public float springBackSpeed = 5f;
     public bool enableSpringBack = true;
@@ -108,6 +113,18 @@ public class MyLever : MonoBehaviour
     
     void Update()
     {
+        // Check if work shift is complete - if so, block ALL input
+        if (GameManager.Instance != null && GameManager.Instance.IsWorkShiftComplete())
+        {
+            if (dragging)
+            {
+                Debug.LogWarning($"Lever '{gameObject.name}': BLOCKED - Work shift complete! Releasing drag.");
+                dragging = false;
+                IsAnyLeverActive = false;
+            }
+            return;
+        }
+
         // Check if GameManager says we shouldn't be processing input
         if (GameManager.Instance != null && !GameManager.Instance.IsCarouselActive())
         {
@@ -119,6 +136,8 @@ public class MyLever : MonoBehaviour
             }
             return;
         }
+
+        Debug.Log($"Lever '{gameObject.name}': Update - dragging={dragging}, carousel active={GameManager.Instance?.IsCarouselActive()}");
 
         // Only process input if this lever's wrapper is centered
         if (carousel != null && myCarouselWrapper != null)
@@ -167,6 +186,7 @@ public class MyLever : MonoBehaviour
             {
                 inputPosition = touch.position.ReadValue();
                 inputPressed = true;
+                inputHeld = true; // IMPORTANT: Set inputHeld on first press too!
                 inputHandled = true;
 
                 // Hide/accelerate bonus message on touch
@@ -175,8 +195,7 @@ public class MyLever : MonoBehaviour
                     GameManager.Instance.HideBonusMessage();
                 }
             }
-
-            if (touch.press.isPressed)
+            else if (touch.press.isPressed)
             {
                 inputPosition = touch.position.ReadValue();
                 inputHeld = true;
@@ -196,11 +215,13 @@ public class MyLever : MonoBehaviour
             var mouse = Mouse.current;
             if (mouse != null)
             {
+                // Always read mouse position when checking mouse input
                 inputPosition = mouse.position.ReadValue();
 
                 if (mouse.leftButton.wasPressedThisFrame)
                 {
                     inputPressed = true;
+                    inputHeld = true; // IMPORTANT: Set inputHeld on first press too!
 
                     // Hide/accelerate bonus message on click
                     if (GameManager.Instance != null)
@@ -208,8 +229,7 @@ public class MyLever : MonoBehaviour
                         GameManager.Instance.HideBonusMessage();
                     }
                 }
-
-                if (mouse.leftButton.isPressed)
+                else if (mouse.leftButton.isPressed)
                 {
                     inputHeld = true;
                 }
@@ -237,13 +257,52 @@ public class MyLever : MonoBehaviour
                 return;
             }
 
-            Ray ray = mainCamera.ScreenPointToRay(inputPosition);
-            Debug.Log($"Lever '{gameObject.name}': Ray created: origin={ray.origin}, direction={ray.direction}");
+            // Convert lever bounds to screen space for more reliable detection
+            Bounds bounds = myCollider.bounds;
+            Vector3[] corners = new Vector3[8];
+            corners[0] = bounds.min;
+            corners[1] = new Vector3(bounds.min.x, bounds.min.y, bounds.max.z);
+            corners[2] = new Vector3(bounds.min.x, bounds.max.y, bounds.min.z);
+            corners[3] = new Vector3(bounds.max.x, bounds.min.y, bounds.min.z);
+            corners[4] = new Vector3(bounds.min.x, bounds.max.y, bounds.max.z);
+            corners[5] = new Vector3(bounds.max.x, bounds.min.y, bounds.max.z);
+            corners[6] = new Vector3(bounds.max.x, bounds.max.y, bounds.min.z);
+            corners[7] = bounds.max;
 
-            if (myCollider != null && myCollider.enabled && myCollider.bounds.IntersectRay(ray))
+            // Find screen space bounding box
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+            Vector2 max = new Vector2(float.MinValue, float.MinValue);
+
+            foreach (Vector3 corner in corners)
             {
-                Debug.Log($"Lever '{gameObject.name}': ✓ Started dragging - collider HIT!");
+                Vector3 screenPoint = mainCamera.WorldToScreenPoint(corner);
+                if (screenPoint.z > 0) // Only if in front of camera
+                {
+                    min.x = Mathf.Min(min.x, screenPoint.x);
+                    min.y = Mathf.Min(min.y, screenPoint.y);
+                    max.x = Mathf.Max(max.x, screenPoint.x);
+                    max.y = Mathf.Max(max.y, screenPoint.y);
+                }
+            }
+
+            // Add some padding for easier clicking
+            float padding = 20f;
+            min.x -= padding;
+            min.y -= padding;
+            max.x += padding;
+            max.y += padding;
+
+            // Check if input is within screen space bounds
+            bool hitThisLever = inputPosition.x >= min.x && inputPosition.x <= max.x &&
+                               inputPosition.y >= min.y && inputPosition.y <= max.y;
+
+            Debug.Log($"Lever '{gameObject.name}': Screen bounds check - input:{inputPosition}, min:{min}, max:{max}, hit:{hitThisLever}");
+
+            if (hitThisLever)
+            {
+                Debug.Log($"Lever '{gameObject.name}': ✓ Started dragging - SCREEN SPACE HIT!");
                 dragging = true;
+                IsAnyLeverActive = true; // Set static flag so carousel knows
                 lastMouseY = inputPosition.y;
                 lastMouseX = inputPosition.x;
                 targetRotation = transform.localRotation.eulerAngles.x;
@@ -254,7 +313,7 @@ public class MyLever : MonoBehaviour
             }
             else
             {
-                Debug.Log($"Lever '{gameObject.name}': ✗ Ray MISSED collider. Collider exists: {myCollider != null}, Collider enabled: {myCollider?.enabled}, Bounds: {(myCollider != null ? myCollider.bounds.ToString() : "NULL")}");
+                Debug.Log($"Lever '{gameObject.name}': ✗ MISSED - input outside screen bounds");
             }
         }
 
@@ -266,9 +325,13 @@ public class MyLever : MonoBehaviour
 
             // Vertical rotation (existing)
             float deltaY = currentMouseY - lastMouseY;
+            Debug.Log($"Lever '{gameObject.name}': DRAGGING - deltaY={deltaY}, currentY={currentMouseY}, lastY={lastMouseY}, rotSpeed={rotationSpeed}");
+
             targetRotation += deltaY * rotationSpeed;
             targetRotation = Mathf.Clamp(targetRotation, minRotation, maxRotation);
             transform.localRotation = Quaternion.Euler(targetRotation, 0, 0);
+
+            Debug.Log($"Lever '{gameObject.name}': New rotation={targetRotation}, transform={transform.localRotation.eulerAngles.x}");
 
             // Horizontal sliding with proper clamping
             if (enableSliding)
@@ -289,10 +352,24 @@ public class MyLever : MonoBehaviour
             lastMouseY = currentMouseY;
             lastMouseX = currentMouseX;
         }
+        else if (dragging && !inputHeld)
+        {
+            Debug.LogWarning($"Lever '{gameObject.name}': dragging=TRUE but inputHeld=FALSE!");
+        }
+        else if (!dragging && inputHeld)
+        {
+            Debug.Log($"Lever '{gameObject.name}': dragging=FALSE but inputHeld=TRUE");
+        }
 
         // Handle input release
         if (inputReleased)
         {
+            if (dragging)
+            {
+                Debug.Log($"Lever '{gameObject.name}': Released - setting cooldown");
+                IsAnyLeverActive = false;
+                lastLeverReleaseTime = Time.time;
+            }
             dragging = false;
         }
 
@@ -398,6 +475,11 @@ public class MyLever : MonoBehaviour
             current = current.parent;
         }
         return null;
+    }
+
+    public static bool IsInCooldown()
+    {
+        return (Time.time - lastLeverReleaseTime) < LeverCooldown;
     }
 
     void OnDrawGizmos()

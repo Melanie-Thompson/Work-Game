@@ -163,11 +163,12 @@ public class WorkTimeBar : MonoBehaviour
     {
         Debug.Log($"WorkTimeBar: All {allPieces.Count} pieces completed! Total time: {elapsedTime / 60f:F2} minutes");
 
-        // Award bonus points
+        // Award bonus points and disable input
         if (GameManager.Instance != null)
         {
             GameManager.Instance.AddScore(bonusPointsOnComplete);
-            GameManager.Instance.ShowBonusMessage($"WORK SHIFT COMPLETE! +{bonusPointsOnComplete} BONUS!");
+            GameManager.Instance.ShowBonusMessage($"WORK SHIFT COMPLETE! +{bonusPointsOnComplete} BONUS!", duration: 5f, priority: 1);
+            GameManager.Instance.OnWorkShiftComplete(); // Disable all input
             Debug.Log($"WorkTimeBar: Awarded {bonusPointsOnComplete} bonus points for completing all groups");
         }
 

@@ -9,7 +9,7 @@ public class RetroArcadeText : MonoBehaviour
     [Header("Movement")]
     public float riseSpeed = 50f;
     public bool destroyWhenOffScreen = true;
-    public float destroyHeight = 1000f;
+    public float destroyHeight = 2000f;
 
     [Header("Sine Wave Letter Movement")]
     public bool enableSineWaveMovement = true;

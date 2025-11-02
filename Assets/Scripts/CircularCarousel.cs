@@ -264,7 +264,21 @@ public class CircularCarousel : MonoBehaviour
 
     void HandleInput()
     {
-        Debug.Log($"Carousel: HandleInput called - carouselEnabled={carouselEnabled}, DialActive={DialRotaryPhone.IsDialActive}, GMCarouselActive={gameManager?.IsCarouselActive()}");
+        Debug.Log($"Carousel: HandleInput called - carouselEnabled={carouselEnabled}, DialActive={DialRotaryPhone.IsDialActive}, LeverActive={MyLever.IsAnyLeverActive}, LeverCooldown={MyLever.IsInCooldown()}, GMCarouselActive={gameManager?.IsCarouselActive()}, WorkComplete={gameManager?.IsWorkShiftComplete()}");
+
+        // Check if work shift is complete
+        if (gameManager != null && gameManager.IsWorkShiftComplete())
+        {
+            Debug.Log("Carousel: Input ignored - work shift complete");
+            return;
+        }
+
+        // Check if lever is being used or in cooldown
+        if (MyLever.IsAnyLeverActive || MyLever.IsInCooldown())
+        {
+            Debug.Log($"Carousel: Input ignored - lever active or in cooldown");
+            return;
+        }
 
         // Check if dial is being used
         if (DialRotaryPhone.IsDialActive)

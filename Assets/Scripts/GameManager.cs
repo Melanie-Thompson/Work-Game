@@ -71,6 +71,7 @@ public class GameManager : MonoBehaviour
     private bool isCarouselActive = true;
     private bool isMonitorActive = false;
     private bool hasExitedMonitorOnce = false;
+    private bool isWorkShiftComplete = false;
     
     void Awake()
     {
@@ -138,8 +139,8 @@ public class GameManager : MonoBehaviour
                 retroText.sineWaveSpeed = 2f;
                 retroText.letterDelay = 0.3f;
                 retroText.destroyWhenOffScreen = false; // Don't destroy - just deactivate
-                retroText.destroyHeight = 1000f;
-                retroText.riseSpeed = 50f;
+                retroText.destroyHeight = 2000f;
+                retroText.riseSpeed = 150f;
                 retroText.enableShimmer = true;
                 retroText.shimmerSpeed = 1f;
                 retroText.shimmerColorA = Color.red;
@@ -484,22 +485,39 @@ public class GameManager : MonoBehaviour
         bonusMessageDuration = 0f;
     }
 
-    public void ShowBonusMessage(string message)
+    public void ShowBonusMessage(string message, float duration = 3f, int priority = 10)
     {
-        Debug.Log($"GameManager: ShowBonusMessage called - adding '{message}' to queue");
+        Debug.Log($"GameManager: ShowBonusMessage called - emitting '{message}' to MessageQueue");
 
-        // Add message to queue
-        bonusMessageQueue.Enqueue(message);
-        Debug.Log($"GameManager: Queue now has {bonusMessageQueue.Count} messages");
-
-        // If not currently showing a message, the Update cycle will pick it up immediately
+        // Use new MessageQueue system
+        if (MessageQueue.Instance != null)
+        {
+            MessageQueue.Instance.EmitMessage(message, duration, priority);
+        }
+        else
+        {
+            Debug.LogError("GameManager: MessageQueue.Instance is null! Cannot emit message.");
+            // Fallback to old system
+            bonusMessageQueue.Enqueue(message);
+            Debug.Log($"GameManager: Using fallback queue - now has {bonusMessageQueue.Count} messages");
+        }
     }
 
     public void HideBonusMessage()
     {
         Debug.Log("=== HideBonusMessage called ===");
 
-        // Use Unity's implicit bool conversion to properly check for destroyed objects
+        // Use new MessageQueue system to skip current message
+        if (MessageQueue.Instance != null)
+        {
+            MessageQueue.Instance.SkipCurrentMessage();
+        }
+        else
+        {
+            Debug.LogError("GameManager: MessageQueue.Instance is null!");
+        }
+
+        // Legacy fallback system
         if (!bonusMessageObject)
         {
             Debug.Log("GameManager: bonusMessageObject is null or destroyed, nothing to hide");
@@ -509,7 +527,7 @@ public class GameManager : MonoBehaviour
         // If currently showing a message, skip it and move to the next
         if (isShowingBonusMessage)
         {
-            Debug.Log("GameManager: Skipping current message");
+            Debug.Log("GameManager: Skipping current message (legacy)");
             HideBonusMessageImmediate();
             isShowingBonusMessage = false;
             currentMessageTimer = 0f;
@@ -658,6 +676,23 @@ public class GameManager : MonoBehaviour
         return false;
     }
 
+    public void OnWorkShiftComplete()
+    {
+        Debug.Log("=== GameManager: Work shift completed! Disabling all input ===");
+        isWorkShiftComplete = true;
+
+        // Disable carousel
+        if (carousel != null)
+        {
+            carousel.DisableCarousel();
+        }
+    }
+
+    public bool IsWorkShiftComplete()
+    {
+        return isWorkShiftComplete;
+    }
+
     // Phone system - called when phone icon is clicked
     public void OnPhoneNumberCalled(string phoneNumber)
     {
@@ -673,10 +708,10 @@ public class GameManager : MonoBehaviour
         // Award points for making a call
         AddScore(100);
 
-        // Show calling message first
-        ShowBonusMessage($"CALLING {phoneNumber}...");
+        // Show calling message first (3 seconds - full rise time)
+        ShowBonusMessage($"CALLING {phoneNumber}...", duration: 3f);
 
-        // Show success message after a delay
+        // Show success message after calling message finishes
         activeCallCoroutine = StartCoroutine(ShowCallSuccessMessage(phoneNumber));
 
         // TODO: Add logic to check if this is the correct number for current story point
@@ -685,17 +720,12 @@ public class GameManager : MonoBehaviour
 
     private System.Collections.IEnumerator ShowCallSuccessMessage(string phoneNumber)
     {
-        // Wait for the phone to ring/wobble (1 second)
-        yield return new WaitForSeconds(1f);
+        // Wait for the first message to complete (3 seconds)
+        yield return new WaitForSeconds(3f);
 
-        // Hide the "CALLING..." message
-        Debug.Log($"GameManager: Hiding calling message, showing success");
-        HideBonusMessageImmediate();
-        isShowingBonusMessage = false;
-
-        // Show success message
+        // Show success message (MessageQueue will automatically display it after first message finishes)
         Debug.Log($"GameManager: Showing success message for call to {phoneNumber}");
-        ShowBonusMessage($"CALL CONNECTED! +500 POINTS");
+        ShowBonusMessage($"CALL CONNECTED! +500 POINTS", duration: 3f);
         AddScore(500);
 
         // Clear the coroutine reference
