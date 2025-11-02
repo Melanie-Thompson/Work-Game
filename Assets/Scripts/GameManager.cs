@@ -7,6 +7,7 @@ public class GameManager : MonoBehaviour
 
     [Header("References")]
     public CircularCarousel carousel;
+    public WorkTimeBar workTimeBar; // Reference to WorkTimeBar
     public TextMeshProUGUI scoreText;
     public GameObject bonusMessageObject; // Reference to BonusMessage GameObject
     public GameObject emailCanvas; // Reference to Email Canvas
@@ -136,7 +137,7 @@ public class GameManager : MonoBehaviour
                 retroText.sineWaveAmplitude = 10f;
                 retroText.sineWaveSpeed = 2f;
                 retroText.letterDelay = 0.3f;
-                retroText.destroyWhenOffScreen = true;
+                retroText.destroyWhenOffScreen = false; // Don't destroy - just deactivate
                 retroText.destroyHeight = 1000f;
                 retroText.riseSpeed = 50f;
                 retroText.enableShimmer = true;
@@ -216,7 +217,13 @@ public class GameManager : MonoBehaviour
         // Update email canvas visibility based on initial story point
         UpdateEmailCanvasVisibility();
     }
-    
+
+    void Update()
+    {
+        // Process bonus message queue
+        ProcessBonusMessageQueue();
+    }
+
     public bool IsCarouselActive()
     {
         return isCarouselActive;
@@ -252,11 +259,16 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log($"GameManager: Found monitor '{monitor.gameObject.name}', enabling it now");
             currentActiveMonitor = monitor;
+
+            // IMPORTANT: Set GameManager reference BEFORE enabling
             monitor.SetGameManager(this);
 
             // Check if already enabled
-            Debug.Log($"GameManager: Monitor enabled state BEFORE: {monitor.enabled}");
+            Debug.Log($"GameManager: Monitor enabled state BEFORE: {monitor.enabled}, gameObject active: {monitor.gameObject.activeInHierarchy}");
+
+            // Enable the monitor component - this will trigger OnEnable
             monitor.enabled = true;
+
             Debug.Log($"GameManager: Monitor enabled state AFTER: {monitor.enabled}");
             Debug.Log($"GameManager: Successfully enabled monitor on {clickedObject.name}");
         }
@@ -310,7 +322,7 @@ public class GameManager : MonoBehaviour
         if (!hasExitedMonitorOnce)
         {
             hasExitedMonitorOnce = true;
-            Debug.Log("GameManager: First monitor exit - adding 20000 points and showing bonus message with delay");
+            Debug.Log("GameManager: First monitor exit - adding 20000 points and showing bonus message");
             AddScore(20000);
 
             // Get message from story array
@@ -320,7 +332,8 @@ public class GameManager : MonoBehaviour
                 message = story[storyValue].bonusMessage;
             }
 
-            bonusMessageCoroutine = StartCoroutine(ShowBonusMessageDelayed(message, 0.5f));
+            // Add message to queue (will show immediately via Update cycle)
+            ShowBonusMessage(message);
 
             // Advance to next story point after induction is complete
             AdvanceStory();
@@ -372,6 +385,87 @@ public class GameManager : MonoBehaviour
     private Coroutine bonusMessageCoroutine;
     private float bonusMessageStartTime = -999f;
     private float bonusMessageDuration = 0f;
+    private Coroutine activeCallCoroutine;
+
+    // Queue-based bonus message system
+    private System.Collections.Generic.Queue<string> bonusMessageQueue = new System.Collections.Generic.Queue<string>();
+    private bool isShowingBonusMessage = false;
+    private float currentMessageTimer = 0f;
+    private float messageDisplayDuration = 3f; // How long to show each message
+
+    void ProcessBonusMessageQueue()
+    {
+        // If we're showing a message, update its timer
+        if (isShowingBonusMessage)
+        {
+            currentMessageTimer += Time.deltaTime;
+
+            // Check if it's time to hide the current message
+            if (currentMessageTimer >= messageDisplayDuration)
+            {
+                Debug.Log("GameManager: Message display time expired, hiding message");
+                HideBonusMessageImmediate();
+                isShowingBonusMessage = false;
+            }
+        }
+        // If not showing a message and queue has messages, show the next one
+        else if (bonusMessageQueue.Count > 0)
+        {
+            string nextMessage = bonusMessageQueue.Dequeue();
+            Debug.Log($"GameManager: Processing queued message: '{nextMessage}' ({bonusMessageQueue.Count} remaining in queue)");
+            ShowBonusMessageImmediate(nextMessage);
+            isShowingBonusMessage = true;
+            currentMessageTimer = 0f;
+        }
+    }
+
+    void ShowBonusMessageImmediate(string message)
+    {
+        Debug.Log($"GameManager: ShowBonusMessageImmediate called with: '{message}'");
+
+        if (bonusMessageObject == null)
+        {
+            Debug.LogError("GameManager: bonusMessageObject is null!");
+            return;
+        }
+
+        // Reset position to starting Y
+        RectTransform rectTransform = bonusMessageObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.localPosition = new Vector3(rectTransform.localPosition.x, bonusMessageStartY, rectTransform.localPosition.z);
+            Debug.Log($"GameManager: Reset position to y={bonusMessageStartY}");
+        }
+
+        // Reset RetroArcadeText speed
+        var retroText = bonusMessageObject.GetComponent<RetroArcadeText>();
+        if (retroText != null)
+        {
+            retroText.riseSpeed = 50f;
+            Debug.Log("GameManager: Reset RetroArcadeText speed");
+        }
+
+        // Update text
+        var bonusText = bonusMessageObject.GetComponent<TextMeshProUGUI>();
+        if (bonusText != null)
+        {
+            bonusText.text = message;
+            Debug.Log($"GameManager: Set text to '{message}'");
+        }
+
+        // Activate the object
+        bonusMessageObject.SetActive(true);
+        Debug.Log($"GameManager: BonusMessage activated and showing");
+    }
+
+    void HideBonusMessageImmediate()
+    {
+        if (bonusMessageObject != null && bonusMessageObject.activeSelf)
+        {
+            bonusMessageObject.SetActive(false);
+            Debug.Log("GameManager: BonusMessage hidden");
+        }
+    }
 
     private System.Collections.IEnumerator ShowBonusMessageDelayed(string message, float delay)
     {
@@ -392,46 +486,13 @@ public class GameManager : MonoBehaviour
 
     public void ShowBonusMessage(string message)
     {
-        if (bonusMessageObject != null)
-        {
-            Debug.Log($"GameManager: ShowBonusMessage called with message: {message}");
+        Debug.Log($"GameManager: ShowBonusMessage called - adding '{message}' to queue");
 
-            // Reset position to starting Y position
-            RectTransform rectTransform = bonusMessageObject.GetComponent<RectTransform>();
-            if (rectTransform != null)
-            {
-                // Store original position
-                Vector3 originalPos = rectTransform.localPosition;
-                // Start at configured Y position
-                rectTransform.localPosition = new Vector3(originalPos.x, bonusMessageStartY, originalPos.z);
-                Debug.Log($"GameManager: Reset bonus message position to y={bonusMessageStartY}");
-            }
+        // Add message to queue
+        bonusMessageQueue.Enqueue(message);
+        Debug.Log($"GameManager: Queue now has {bonusMessageQueue.Count} messages");
 
-            // Update the text
-            var bonusText = bonusMessageObject.GetComponent<TMP_Text>();
-            if (bonusText == null)
-            {
-                bonusText = bonusMessageObject.GetComponent<TextMeshProUGUI>();
-            }
-
-            if (bonusText != null)
-            {
-                bonusText.text = message;
-                Debug.Log($"GameManager: Set bonus text to: {message}");
-            }
-            else
-            {
-                Debug.LogError("GameManager: No TextMeshPro component found on bonusMessageObject!");
-            }
-
-            // Show the bonus message
-            bonusMessageObject.SetActive(true);
-            Debug.Log($"GameManager: BonusMessage shown");
-        }
-        else
-        {
-            Debug.LogWarning("GameManager: bonusMessageObject is not assigned!");
-        }
+        // If not currently showing a message, the Update cycle will pick it up immediately
     }
 
     public void HideBonusMessage()
@@ -445,19 +506,16 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        Debug.Log($"GameManager: bonusMessageObject exists and active? {bonusMessageObject.activeSelf}");
-        Debug.Log($"GameManager: Time.time: {Time.time}, bonusMessageStartTime: {bonusMessageStartTime}, bonusMessageDuration: {bonusMessageDuration}");
-
-        // Check if we're within the timeout duration
-        bool inTimeoutPeriod = (Time.time - bonusMessageStartTime) < bonusMessageDuration;
-        Debug.Log($"GameManager: In timeout period? {inTimeoutPeriod}");
-
-        if (inTimeoutPeriod)
+        // If currently showing a message, skip it and move to the next
+        if (isShowingBonusMessage)
         {
-            Debug.Log($"GameManager: Click during timeout period! Time elapsed: {Time.time - bonusMessageStartTime}s / {bonusMessageDuration}s");
+            Debug.Log("GameManager: Skipping current message");
+            HideBonusMessageImmediate();
+            isShowingBonusMessage = false;
+            currentMessageTimer = 0f;
         }
 
-        // Stop any pending bonus message coroutine
+        // Stop any pending bonus message coroutine (for legacy support)
         if (bonusMessageCoroutine != null)
         {
             StopCoroutine(bonusMessageCoroutine);
@@ -465,45 +523,6 @@ public class GameManager : MonoBehaviour
             bonusMessageStartTime = -999f;
             bonusMessageDuration = 0f;
             Debug.Log("GameManager: Stopped pending bonus message coroutine");
-        }
-
-        // Accelerate the bonus message off screen if it's showing
-        // Use try-catch to handle race condition where object might be destroyed between checks
-        try
-        {
-            if (bonusMessageObject.activeSelf)
-            {
-                Debug.Log("GameManager: bonusMessageObject is active, looking for RetroArcadeText component");
-                var retroText = bonusMessageObject.GetComponent<RetroArcadeText>();
-                Debug.Log($"GameManager: RetroArcadeText found? {retroText != null}");
-
-                if (retroText != null)
-                {
-                    Debug.Log($"GameManager: Current riseSpeed: {retroText.riseSpeed}");
-
-                    // Always dramatically increase speed - make it shoot off screen fast!
-                    // If already accelerated, make it even faster
-                    float currentSpeed = retroText.riseSpeed;
-                    float accelerationSpeed = currentSpeed < 100f ? 1000f : currentSpeed * 2f;
-
-                    retroText.riseSpeed = accelerationSpeed;
-                    Debug.Log($"GameManager: BonusMessage accelerating off screen - NEW speed: {accelerationSpeed} (was {currentSpeed})");
-                }
-                else
-                {
-                    // If no RetroArcadeText, just hide it
-                    bonusMessageObject.SetActive(false);
-                    Debug.Log("GameManager: BonusMessage hidden (no RetroArcadeText)");
-                }
-            }
-            else
-            {
-                Debug.Log("GameManager: bonusMessageObject is not active, nothing to hide");
-            }
-        }
-        catch (MissingReferenceException)
-        {
-            Debug.Log("GameManager: bonusMessageObject was destroyed between checks, ignoring");
         }
     }
 
@@ -605,5 +624,82 @@ public class GameManager : MonoBehaviour
             return story[storyValue].monitorMessages;
         }
         return null;
+    }
+
+    // Work Time Bar controls
+    public void ResetWorkTimeBar()
+    {
+        if (workTimeBar != null)
+        {
+            workTimeBar.ResetTimer();
+            Debug.Log("GameManager: Work time bar reset");
+        }
+        else
+        {
+            Debug.LogWarning("GameManager: workTimeBar is not assigned!");
+        }
+    }
+
+    public float GetWorkTimeBarProgress()
+    {
+        if (workTimeBar != null)
+        {
+            return workTimeBar.GetProgress();
+        }
+        return 0f;
+    }
+
+    public bool IsWorkTimeBarComplete()
+    {
+        if (workTimeBar != null)
+        {
+            return workTimeBar.IsComplete();
+        }
+        return false;
+    }
+
+    // Phone system - called when phone icon is clicked
+    public void OnPhoneNumberCalled(string phoneNumber)
+    {
+        Debug.Log($"=== GameManager: Phone number called: '{phoneNumber}' ===");
+
+        // Stop any previous call coroutine
+        if (activeCallCoroutine != null)
+        {
+            StopCoroutine(activeCallCoroutine);
+            Debug.Log("GameManager: Stopped previous call coroutine");
+        }
+
+        // Award points for making a call
+        AddScore(100);
+
+        // Show calling message first
+        ShowBonusMessage($"CALLING {phoneNumber}...");
+
+        // Show success message after a delay
+        activeCallCoroutine = StartCoroutine(ShowCallSuccessMessage(phoneNumber));
+
+        // TODO: Add logic to check if this is the correct number for current story point
+        // TODO: Trigger story events, play sounds, etc.
+    }
+
+    private System.Collections.IEnumerator ShowCallSuccessMessage(string phoneNumber)
+    {
+        // Wait for the phone to ring/wobble (1 second)
+        yield return new WaitForSeconds(1f);
+
+        // Hide the "CALLING..." message
+        Debug.Log($"GameManager: Hiding calling message, showing success");
+        HideBonusMessageImmediate();
+        isShowingBonusMessage = false;
+
+        // Show success message
+        Debug.Log($"GameManager: Showing success message for call to {phoneNumber}");
+        ShowBonusMessage($"CALL CONNECTED! +500 POINTS");
+        AddScore(500);
+
+        // Clear the coroutine reference
+        activeCallCoroutine = null;
+        Debug.Log($"GameManager: Call to {phoneNumber} successful!");
     }
 }

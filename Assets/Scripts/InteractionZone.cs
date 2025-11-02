@@ -104,11 +104,14 @@ public class InteractionZone : MonoBehaviour
     {
         if (boxCollider == null) return true; // If no collider, allow all interactions
 
-        Ray ray = Camera.main.ScreenPointToRay(screenPosition);
-        RaycastHit hit;
+        // IMPORTANT: BoxCollider.Raycast doesn't work with trigger colliders!
+        // So we need to use bounds checking instead
 
-        // Check if the ray hits this specific collider
-        if (boxCollider.Raycast(ray, out hit, 1000f))
+        Ray ray = Camera.main.ScreenPointToRay(screenPosition);
+
+        // Check if the ray intersects the bounds of the box collider
+        float distance;
+        if (boxCollider.bounds.IntersectRay(ray, out distance))
         {
             Debug.Log($"Position {screenPosition} is INSIDE interaction zone '{gameObject.name}'");
             return true;

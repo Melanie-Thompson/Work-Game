@@ -1,0 +1,151 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.EventSystems;
+
+public class PhoneIconClick : MonoBehaviour, IPointerClickHandler
+{
+    [Header("References")]
+    [Tooltip("The DialRotaryPhone script to get the phone number from")]
+    public DialRotaryPhone dialPhone;
+
+    [Header("Wobble Settings")]
+    [Tooltip("Maximum rotation angle when wobbling")]
+    public float wobbleAngle = 20f;
+
+    [Tooltip("How long the wobble/ring lasts in seconds before resetting")]
+    public float wobbleDuration = 1f;
+
+    [Tooltip("How fast the wobble oscillates - high value for jittery phone effect")]
+    public float wobbleSpeed = 40f;
+
+    [Tooltip("Axis to rotate around - Z-axis for side-to-side swing like a hanging phone")]
+    public Vector3 wobbleAxis = new Vector3(0, 0, 1);
+
+    private Camera mainCamera;
+    private bool isWobbling = false;
+    private float wobbleTimer = 0f;
+    private Quaternion originalRotation;
+    private Collider phoneIconCollider;
+
+    void Start()
+    {
+        mainCamera = Camera.main;
+        originalRotation = transform.localRotation;
+
+        // Get or add collider for clicking (UI element, so collider not needed)
+        phoneIconCollider = GetComponent<Collider>();
+        if (phoneIconCollider != null)
+        {
+            // Remove any 3D collider - we're using UI event system
+            Destroy(phoneIconCollider);
+            phoneIconCollider = null;
+            Debug.Log("PhoneIconClick: Removed 3D collider - using UI event system instead");
+        }
+
+        // Try to find DialRotaryPhone if not assigned
+        if (dialPhone == null)
+        {
+            dialPhone = FindFirstObjectByType<DialRotaryPhone>();
+            if (dialPhone != null)
+            {
+                Debug.Log($"PhoneIconClick: Found DialRotaryPhone: {dialPhone.gameObject.name}");
+            }
+            else
+            {
+                Debug.LogError("PhoneIconClick: Could not find DialRotaryPhone in scene!");
+            }
+        }
+    }
+
+    void Update()
+    {
+        // Handle wobble animation
+        if (isWobbling)
+        {
+            wobbleTimer += Time.deltaTime;
+
+            if (wobbleTimer < wobbleDuration)
+            {
+                // Calculate wobble using damped sine wave (like a pendulum)
+                float normalizedTime = wobbleTimer / wobbleDuration;
+                float dampingFactor = 1f - normalizedTime; // Reduces over time
+                float wobble = Mathf.Sin(wobbleTimer * wobbleSpeed) * wobbleAngle * dampingFactor;
+
+                // Apply rotation around the specified axis
+                transform.localRotation = originalRotation * Quaternion.AngleAxis(wobble, wobbleAxis);
+            }
+            else
+            {
+                // Wobble finished
+                isWobbling = false;
+                transform.localRotation = originalRotation;
+                Debug.Log("PhoneIconClick: Wobble finished");
+            }
+        }
+    }
+
+    // Unity UI Event System callback - called when this UI element is clicked
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        Debug.Log("PhoneIconClick: UI element clicked via Event System!");
+        OnPhoneIconClicked();
+    }
+
+
+    void OnPhoneIconClicked()
+    {
+        Debug.Log("=== PhoneIconClick: Phone icon clicked! ===");
+        Debug.Log($"PhoneIconClick: Starting wobble - angle:{wobbleAngle}, speed:{wobbleSpeed}, axis:{wobbleAxis}");
+        Debug.Log($"PhoneIconClick: Original rotation: {transform.localRotation.eulerAngles}");
+
+        // Start wobble
+        isWobbling = true;
+        wobbleTimer = 0f;
+        originalRotation = transform.localRotation;
+
+        // Get the phone number
+        string phoneNumber = "";
+        if (dialPhone != null)
+        {
+            phoneNumber = dialPhone.GetPhoneNumber();
+            Debug.Log($"PhoneIconClick: Phone number is '{phoneNumber}'");
+        }
+        else
+        {
+            Debug.LogError("PhoneIconClick: No DialRotaryPhone reference!");
+        }
+
+        // Fire event to GameManager
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnPhoneNumberCalled(phoneNumber);
+        }
+        else
+        {
+            Debug.LogError("PhoneIconClick: GameManager.Instance is null!");
+        }
+
+        // Reset the phone number after wobble/ring completes (delayed)
+        StartCoroutine(ResetPhoneNumberAfterRing());
+    }
+
+    private System.Collections.IEnumerator ResetPhoneNumberAfterRing()
+    {
+        // Wait for the wobble/ring to finish
+        yield return new WaitForSeconds(wobbleDuration);
+
+        // Clear the phone number
+        if (dialPhone != null)
+        {
+            dialPhone.ClearPhoneNumber();
+            Debug.Log("PhoneIconClick: Phone number cleared after ring");
+        }
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        // Visualize the clickable area
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireCube(transform.position, transform.lossyScale);
+    }
+}

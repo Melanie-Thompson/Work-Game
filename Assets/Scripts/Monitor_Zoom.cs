@@ -208,7 +208,18 @@ public class ClickableMonitor : MonoBehaviour
     void OnEnable()
     {
         // When enabled by GameManager, automatically start zoom in
-        Debug.Log("Monitor: OnEnable called - auto-starting zoom in");
+        Debug.Log("=== Monitor: OnEnable called - auto-starting zoom in ===");
+        Debug.Log($"Monitor enabled state: {enabled}, gameObject active: {gameObject.activeInHierarchy}");
+
+        // Clean up any previous state
+        CleanupAllImages();
+
+        // Stop any running coroutines from previous session
+        if (typingCoroutine != null)
+        {
+            StopCoroutine(typingCoroutine);
+            typingCoroutine = null;
+        }
 
         // Get monitor messages from GameManager's current story point
         if (gameManager != null)
@@ -242,15 +253,24 @@ public class ClickableMonitor : MonoBehaviour
                 Debug.Log("Monitor: Story point has no monitor messages or is empty");
             }
         }
+        else
+        {
+            Debug.LogWarning("Monitor: gameManager is NULL in OnEnable!");
+        }
 
+        // Reset all state for fresh zoom in
         isZoomed = true;
         zoomStartTime = Time.time;
         currentTextIndex = 0;
         isTypingComplete = false;
         hasStartedTyping = false;
         currentImages = null;
+        isPressingMouse = false;
+
+        Debug.Log("Monitor: Calling UpdateUIVisibility and DisableOtherColliders");
         UpdateUIVisibility();
         DisableOtherColliders();
+        Debug.Log("=== Monitor: OnEnable complete ===");
     }
     
     void Update()
