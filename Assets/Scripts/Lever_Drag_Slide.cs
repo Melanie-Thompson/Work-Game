@@ -188,12 +188,6 @@ public class MyLever : MonoBehaviour
                 inputPressed = true;
                 inputHeld = true; // IMPORTANT: Set inputHeld on first press too!
                 inputHandled = true;
-
-                // Hide/accelerate bonus message on touch
-                if (GameManager.Instance != null)
-                {
-                    GameManager.Instance.HideBonusMessage();
-                }
             }
             else if (touch.press.isPressed)
             {
@@ -222,12 +216,6 @@ public class MyLever : MonoBehaviour
                 {
                     inputPressed = true;
                     inputHeld = true; // IMPORTANT: Set inputHeld on first press too!
-
-                    // Hide/accelerate bonus message on click
-                    if (GameManager.Instance != null)
-                    {
-                        GameManager.Instance.HideBonusMessage();
-                    }
                 }
                 else if (mouse.leftButton.isPressed)
                 {

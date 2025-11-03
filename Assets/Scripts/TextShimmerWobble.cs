@@ -7,7 +7,7 @@ public class RetroArcadeText : MonoBehaviour
     public TMP_Text textComponent;
     
     [Header("Movement")]
-    public float riseSpeed = 50f;
+    public float riseSpeed = 300f;
     public bool destroyWhenOffScreen = true;
     public float destroyHeight = 2000f;
 
@@ -56,12 +56,21 @@ public class RetroArcadeText : MonoBehaviour
         RectTransform rectTransform = transform as RectTransform;
         if (rectTransform != null)
         {
-            // UI element - use localPosition
-            rectTransform.localPosition += Vector3.up * riseSpeed * Time.deltaTime;
+            // UI element - use anchoredPosition for proper UI positioning
+            Vector2 anchoredPos = rectTransform.anchoredPosition;
+            float movement = riseSpeed * Time.deltaTime;
+            anchoredPos.y += movement;
+            rectTransform.anchoredPosition = anchoredPos;
+
+            if (Time.frameCount % 30 == 0) // Log every 30 frames
+            {
+                Debug.Log($"RetroArcadeText: Y={anchoredPos.y:F1}, riseSpeed={riseSpeed}, movement={movement:F2}, destroyHeight={destroyHeight}");
+            }
 
             // Destroy when off screen
-            if (destroyWhenOffScreen && rectTransform.localPosition.y > destroyHeight)
+            if (destroyWhenOffScreen && rectTransform.anchoredPosition.y > destroyHeight)
             {
+                Debug.Log($"RetroArcadeText: Destroying at Y={anchoredPos.y}");
                 Destroy(gameObject);
                 return;
             }

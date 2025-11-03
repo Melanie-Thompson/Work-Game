@@ -26,11 +26,26 @@ public class PhoneIconClick : MonoBehaviour, IPointerClickHandler
     private float wobbleTimer = 0f;
     private Quaternion originalRotation;
     private Collider phoneIconCollider;
+    private CircularCarousel carousel;
+    private GameObject myCarouselWrapper;
 
     void Start()
     {
         mainCamera = Camera.main;
         originalRotation = transform.localRotation;
+
+        // Find the carousel
+        carousel = FindFirstObjectByType<CircularCarousel>();
+
+        // Find my carousel wrapper
+        if (carousel != null)
+        {
+            myCarouselWrapper = FindMyCarouselWrapper();
+            if (myCarouselWrapper != null)
+            {
+                Debug.Log($"PhoneIconClick '{gameObject.name}': Found carousel wrapper: {myCarouselWrapper.name}");
+            }
+        }
 
         // Get or add collider for clicking (UI element, so collider not needed)
         phoneIconCollider = GetComponent<Collider>();
@@ -94,6 +109,17 @@ public class PhoneIconClick : MonoBehaviour, IPointerClickHandler
 
     void OnPhoneIconClicked()
     {
+        // ONLY allow clicking when this phone's carousel item is centered
+        if (carousel != null && myCarouselWrapper != null)
+        {
+            GameObject centeredObject = carousel.GetCenteredObject();
+            if (centeredObject != myCarouselWrapper)
+            {
+                Debug.Log($"PhoneIconClick: Ignoring click - not centered (centered item: {centeredObject?.name})");
+                return;
+            }
+        }
+
         Debug.Log("=== PhoneIconClick: Phone icon clicked! ===");
         Debug.Log($"PhoneIconClick: Starting wobble - angle:{wobbleAngle}, speed:{wobbleSpeed}, axis:{wobbleAxis}");
         Debug.Log($"PhoneIconClick: Original rotation: {transform.localRotation.eulerAngles}");
@@ -147,5 +173,25 @@ public class PhoneIconClick : MonoBehaviour, IPointerClickHandler
         // Visualize the clickable area
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireCube(transform.position, transform.lossyScale);
+    }
+
+    GameObject FindMyCarouselWrapper()
+    {
+        Transform current = transform.parent;
+        while (current != null)
+        {
+            if (carousel.carouselObjects != null)
+            {
+                foreach (GameObject carouselObj in carousel.carouselObjects)
+                {
+                    if (carouselObj == current.gameObject)
+                    {
+                        return current.gameObject;
+                    }
+                }
+            }
+            current = current.parent;
+        }
+        return null;
     }
 }

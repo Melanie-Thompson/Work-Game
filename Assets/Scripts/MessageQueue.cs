@@ -65,7 +65,9 @@ public class MessageQueue : MonoBehaviour
     {
         QueuedMessage queuedMsg = new QueuedMessage(message, duration, priority, onComplete);
         messageQueue.Enqueue(queuedMsg);
-        Debug.Log($"MessageQueue: Message emitted - '{message}' (priority: {priority}, duration: {duration}s) - Queue size: {messageQueue.Count}");
+        Debug.LogWarning($"MessageQueue: Message emitted - '{message}' (priority: {priority}, duration: {duration}s) - Queue size: {messageQueue.Count}");
+        Debug.LogWarning("EMIT STACK TRACE:");
+        Debug.LogWarning(System.Environment.StackTrace);
     }
 
     /// <summary>
@@ -73,6 +75,12 @@ public class MessageQueue : MonoBehaviour
     /// </summary>
     private void ProcessQueue()
     {
+        // Debug every 60 frames
+        if (Time.frameCount % 60 == 0 && (isDisplayingMessage || messageQueue.Count > 0))
+        {
+            Debug.Log($"MessageQueue ProcessQueue: isDisplaying={isDisplayingMessage}, queueCount={messageQueue.Count}, timer={currentMessageTimer:F2}/{(currentMessage?.displayDuration ?? 0f)}");
+        }
+
         // If we're displaying a message, update its timer
         if (isDisplayingMessage && currentMessage != null)
         {

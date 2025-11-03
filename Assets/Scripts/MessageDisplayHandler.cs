@@ -16,10 +16,16 @@ public class MessageDisplayHandler : MonoBehaviour
 
     [Header("Display Settings")]
     [Tooltip("Starting Y position for the message")]
-    public float messageStartY = -800f;
+    public float messageStartY = -200f;
 
     [Tooltip("Rise speed for RetroArcadeText animation")]
-    public float riseSpeed = 150f;
+    public float riseSpeed = 300f;
+
+    [Tooltip("Rise speed for high-priority messages (like rabbit hits)")]
+    public float fastRiseSpeed = 2000f;
+
+    [Tooltip("Height at which message disappears")]
+    public float destroyHeight = 2000f;
 
     void Start()
     {
@@ -63,7 +69,7 @@ public class MessageDisplayHandler : MonoBehaviour
     /// </summary>
     private void OnMessageStart(string message)
     {
-        Debug.Log($"MessageDisplayHandler: Displaying message - '{message}'");
+        Debug.LogWarning($"MessageDisplayHandler: === DISPLAYING MESSAGE === '{message}'");
 
         if (messageUIObject == null || messageText == null)
         {
@@ -75,21 +81,29 @@ public class MessageDisplayHandler : MonoBehaviour
         RectTransform rectTransform = messageUIObject.GetComponent<RectTransform>();
         if (rectTransform != null)
         {
-            Vector3 currentPos = rectTransform.localPosition;
-            rectTransform.localPosition = new Vector3(currentPos.x, messageStartY, currentPos.z);
-            Debug.Log($"MessageDisplayHandler: Reset position to y={messageStartY}");
+            Vector2 anchoredPos = rectTransform.anchoredPosition;
+            anchoredPos.y = messageStartY;
+            rectTransform.anchoredPosition = anchoredPos;
+            Debug.Log($"MessageDisplayHandler: Reset anchoredPosition to y={messageStartY}");
         }
 
-        // Reset RetroArcadeText speed if it exists
+        // Don't override RetroArcadeText settings - let Inspector values be used
         var retroText = messageUIObject.GetComponent<RetroArcadeText>();
         if (retroText != null)
         {
+            // Reset rise speed to default value (in case it was accelerated)
             retroText.riseSpeed = riseSpeed;
-            Debug.Log($"MessageDisplayHandler: Reset RetroArcadeText speed to {riseSpeed}");
+            Debug.Log($"MessageDisplayHandler: RetroArcadeText - riseSpeed reset to {retroText.riseSpeed}, destroyHeight={retroText.destroyHeight}");
+        }
+        else
+        {
+            Debug.LogWarning("MessageDisplayHandler: No RetroArcadeText component found on messageUIObject!");
         }
 
-        // Update text
+        // Update text - THIS IS CRITICAL
+        Debug.LogWarning($"MessageDisplayHandler: BEFORE setting text, messageText.text = '{messageText.text}'");
         messageText.text = message;
+        Debug.LogWarning($"MessageDisplayHandler: AFTER setting text, messageText.text = '{messageText.text}'");
 
         // Show the UI
         messageUIObject.SetActive(true);

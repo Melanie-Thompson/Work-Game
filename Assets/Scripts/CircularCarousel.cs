@@ -5,15 +5,15 @@ public class CircularCarousel : MonoBehaviour
 {
     [Header("Carousel Settings")]
     public GameObject[] carouselObjects;  // Public so other scripts can check it
-    public float radius = 3f;
+    public float spacing = 5f; // Distance between items in line
     public float heightOffset = 0f;
     
     [Header("Rotation Settings")]
     public float snapSpeed = 8f;
     
     [Header("Swipe Settings")]
-    public float swipeThreshold = 50f;
-    public float swipeTimeWindow = 0.3f;
+    public float swipeThreshold = 150f;
+    public float swipeTimeWindow = 0.5f;
 
     [Header("Interaction Settings")]
     public float centerTolerance = 30f;
@@ -651,18 +651,25 @@ public class CircularCarousel : MonoBehaviour
     void ArrangeObjects()
     {
         if (carouselObjects == null || carouselObjects.Length == 0) return;
-        
+
         for (int i = 0; i < carouselObjects.Length; i++)
         {
             if (carouselObjects[i] == null) continue;
-            
-            float angle = currentAngle + (i * angleStep);
-            float angleRad = angle * Mathf.Deg2Rad;
-            
-            float x = Mathf.Sin(angleRad) * radius;
-            float y = Mathf.Cos(angleRad) * radius;
-            
-            Vector3 targetPosition = transform.position + new Vector3(x, y, 0);
+
+            // Calculate position offset based on current index
+            float offset = (i - currentIndex) * spacing;
+
+            // Wrap around: if item is too far off screen, wrap it to the other side
+            if (offset > spacing * 1.5f)
+            {
+                offset -= carouselObjects.Length * spacing;
+            }
+            else if (offset < -spacing * 1.5f)
+            {
+                offset += carouselObjects.Length * spacing;
+            }
+
+            Vector3 targetPosition = transform.position + new Vector3(offset, heightOffset, 0);
             carouselObjects[i].transform.position = targetPosition;
         }
     }

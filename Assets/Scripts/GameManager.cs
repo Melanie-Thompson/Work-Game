@@ -15,7 +15,9 @@ public class GameManager : MonoBehaviour
     public TextMeshProUGUI priorityEmailCountText; // Reference to Priority Email Count UI text
 
     [Header("Bonus Message Settings")]
-    public float bonusMessageStartY = -1400f; // Starting Y position for bonus message
+    public float bonusMessageStartY = -200f; // Starting Y position for bonus message
+    public float bonusMessageDestroyHeight = 2000f; // Height at which message disappears
+    public float bonusMessageRiseSpeed = 300f; // Speed at which message rises
 
     [System.Serializable]
     public class MonitorMessage
@@ -117,6 +119,38 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         Debug.Log("=== GAMEMANAGER START ===");
+
+        // Ensure MessageQueue exists in scene
+        if (MessageQueue.Instance == null)
+        {
+            Debug.LogWarning("GameManager: MessageQueue.Instance is NULL! Creating MessageQueue GameObject...");
+            GameObject mqObj = new GameObject("MessageQueue");
+            mqObj.AddComponent<MessageQueue>();
+            Debug.Log("GameManager: MessageQueue GameObject created");
+        }
+        else
+        {
+            Debug.Log("GameManager: MessageQueue.Instance found - using queue system");
+        }
+
+        // Ensure MessageDisplayHandler exists and is configured
+        MessageDisplayHandler handler = FindFirstObjectByType<MessageDisplayHandler>();
+        if (handler == null && bonusMessageObject != null)
+        {
+            Debug.LogWarning("GameManager: No MessageDisplayHandler found! Creating on separate GameObject...");
+            GameObject handlerObj = new GameObject("MessageDisplayHandler");
+            handler = handlerObj.AddComponent<MessageDisplayHandler>();
+            handler.messageUIObject = bonusMessageObject;
+            handler.messageText = bonusMessageObject.GetComponent<TextMeshProUGUI>();
+            handler.messageStartY = bonusMessageStartY;
+            handler.riseSpeed = bonusMessageRiseSpeed;
+            handler.destroyHeight = bonusMessageDestroyHeight;
+            Debug.Log($"GameManager: MessageDisplayHandler created - messageUIObject={bonusMessageObject.name}, startY={bonusMessageStartY}, riseSpeed={bonusMessageRiseSpeed}, destroyHeight={bonusMessageDestroyHeight}");
+        }
+        else if (handler != null)
+        {
+            Debug.Log($"GameManager: MessageDisplayHandler found on {handler.gameObject.name}");
+        }
 
         // Hide bonus message at startup
         if (bonusMessageObject != null)
@@ -221,8 +255,11 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // Process bonus message queue
-        ProcessBonusMessageQueue();
+        // Only use fallback system if MessageQueue doesn't exist
+        if (MessageQueue.Instance == null)
+        {
+            ProcessBonusMessageQueue();
+        }
     }
 
     public bool IsCarouselActive()
@@ -238,10 +275,13 @@ public class GameManager : MonoBehaviour
     // Called by CircularCarousel when user clicks on centered object
     public void OnCarouselObjectClicked(GameObject clickedObject)
     {
-        Debug.Log($"=== GAMEMANAGER: OnCarouselObjectClicked called for {clickedObject.name} ===");
+        Debug.LogWarning($"=== GAMEMANAGER: OnCarouselObjectClicked called for {clickedObject.name} === STACK TRACE:");
+        Debug.LogWarning(System.Environment.StackTrace);
         Debug.Log($"State BEFORE: Carousel={isCarouselActive}, Monitor={isMonitorActive}");
 
-        // Hide bonus message if it's showing
+        // IMPORTANT: Clicking on carousel items should NOT show any bonus messages
+        // Only specific events (rabbit hits, phone calls, etc.) should show messages
+        // So we hide any currently displaying message when opening a monitor
         HideBonusMessage();
 
         // Set global state
@@ -333,8 +373,8 @@ public class GameManager : MonoBehaviour
                 message = story[storyValue].bonusMessage;
             }
 
-            // Add message to queue (will show immediately via Update cycle)
-            ShowBonusMessage(message);
+            // Add message to queue with shorter duration so it rises faster
+            ShowBonusMessage(message, duration: 1.5f);
 
             // Advance to next story point after induction is complete
             AdvanceStory();
@@ -392,10 +432,16 @@ public class GameManager : MonoBehaviour
     private System.Collections.Generic.Queue<string> bonusMessageQueue = new System.Collections.Generic.Queue<string>();
     private bool isShowingBonusMessage = false;
     private float currentMessageTimer = 0f;
-    private float messageDisplayDuration = 3f; // How long to show each message
+    private float messageDisplayDuration = 15f; // How long to show each message
 
     void ProcessBonusMessageQueue()
     {
+        // Debug every 60 frames
+        if (Time.frameCount % 60 == 0 && (isShowingBonusMessage || bonusMessageQueue.Count > 0))
+        {
+            Debug.Log($"GameManager ProcessBonusMessageQueue: isShowingBonusMessage={isShowingBonusMessage}, queueCount={bonusMessageQueue.Count}, timer={currentMessageTimer:F2}/{messageDisplayDuration}");
+        }
+
         // If we're showing a message, update its timer
         if (isShowingBonusMessage)
         {
@@ -407,6 +453,7 @@ public class GameManager : MonoBehaviour
                 Debug.Log("GameManager: Message display time expired, hiding message");
                 HideBonusMessageImmediate();
                 isShowingBonusMessage = false;
+                currentMessageTimer = 0f; // Reset timer
             }
         }
         // If not showing a message and queue has messages, show the next one
@@ -438,12 +485,15 @@ public class GameManager : MonoBehaviour
             Debug.Log($"GameManager: Reset position to y={bonusMessageStartY}");
         }
 
-        // Reset RetroArcadeText speed
+        // Don't override RetroArcadeText settings - let Inspector values be used
         var retroText = bonusMessageObject.GetComponent<RetroArcadeText>();
         if (retroText != null)
         {
-            retroText.riseSpeed = 50f;
-            Debug.Log("GameManager: Reset RetroArcadeText speed");
+            Debug.Log($"GameManager ShowBonusMessageImmediate: RetroArcadeText - riseSpeed={retroText.riseSpeed}, destroyHeight={retroText.destroyHeight}");
+        }
+        else
+        {
+            Debug.LogWarning("GameManager ShowBonusMessageImmediate: No RetroArcadeText component found!");
         }
 
         // Update text
@@ -487,7 +537,9 @@ public class GameManager : MonoBehaviour
 
     public void ShowBonusMessage(string message, float duration = 3f, int priority = 10)
     {
-        Debug.Log($"GameManager: ShowBonusMessage called - emitting '{message}' to MessageQueue");
+        Debug.LogWarning($"=== ShowBonusMessage called with: '{message}' duration={duration}, priority={priority} ===");
+        Debug.LogWarning("STACK TRACE:");
+        Debug.LogWarning(System.Environment.StackTrace);
 
         // Use new MessageQueue system
         if (MessageQueue.Instance != null)
@@ -505,32 +557,35 @@ public class GameManager : MonoBehaviour
 
     public void HideBonusMessage()
     {
-        Debug.Log("=== HideBonusMessage called ===");
+        Debug.Log("=== HideBonusMessage called - HIDING current message only (keeping queue) ===");
 
-        // Use new MessageQueue system to skip current message
+        // Hide the message UI immediately
+        if (bonusMessageObject != null && bonusMessageObject.activeSelf)
+        {
+            bonusMessageObject.SetActive(false);
+            Debug.Log("GameManager: BonusMessage hidden immediately");
+        }
+
+        // Skip ONLY the currently displaying message, but keep queued messages
+        // This allows important messages (like rabbit hits) to still show after interaction
         if (MessageQueue.Instance != null)
         {
-            MessageQueue.Instance.SkipCurrentMessage();
+            Debug.Log("GameManager: Skipping current message (keeping queue intact)");
+            MessageQueue.Instance.SkipCurrentMessage(); // Skip current message only
         }
         else
         {
-            Debug.LogError("GameManager: MessageQueue.Instance is null!");
-        }
+            Debug.LogWarning("GameManager: MessageQueue.Instance is null! Using fallback system.");
 
-        // Legacy fallback system
-        if (!bonusMessageObject)
-        {
-            Debug.Log("GameManager: bonusMessageObject is null or destroyed, nothing to hide");
-            return;
-        }
-
-        // If currently showing a message, skip it and move to the next
-        if (isShowingBonusMessage)
-        {
-            Debug.Log("GameManager: Skipping current message (legacy)");
-            HideBonusMessageImmediate();
-            isShowingBonusMessage = false;
-            currentMessageTimer = 0f;
+            // Legacy fallback system - hide current message but keep queue
+            if (isShowingBonusMessage)
+            {
+                HideBonusMessageImmediate();
+                isShowingBonusMessage = false;
+                currentMessageTimer = 0f;
+                Debug.Log("GameManager: Hidden fallback message immediately");
+            }
+            // Don't clear the queue - let messages continue
         }
 
         // Stop any pending bonus message coroutine (for legacy support)
@@ -681,6 +736,8 @@ public class GameManager : MonoBehaviour
         Debug.Log("=== GameManager: Work shift completed! Disabling all input ===");
         isWorkShiftComplete = true;
 
+        // Don't show message here - WorkTimeBar already shows it
+
         // Disable carousel
         if (carousel != null)
         {
@@ -705,14 +762,14 @@ public class GameManager : MonoBehaviour
             Debug.Log("GameManager: Stopped previous call coroutine");
         }
 
-        // Award points for making a call
-        AddScore(100);
+        // Award points for making a call AND for success immediately
+        AddScore(600); // 100 for calling + 500 for connection
 
-        // Show calling message first (3 seconds - full rise time)
-        ShowBonusMessage($"CALLING {phoneNumber}...", duration: 3f);
+        // Show calling message first (15 seconds - full rise time to reach top)
+        ShowBonusMessage($"CALLING {phoneNumber}...", duration: 15f);
 
-        // Show success message after calling message finishes
-        activeCallCoroutine = StartCoroutine(ShowCallSuccessMessage(phoneNumber));
+        // Show success message immediately after in queue
+        ShowBonusMessage($"CALL CONNECTED! +500 POINTS", duration: 15f);
 
         // TODO: Add logic to check if this is the correct number for current story point
         // TODO: Trigger story events, play sounds, etc.
@@ -720,16 +777,14 @@ public class GameManager : MonoBehaviour
 
     private System.Collections.IEnumerator ShowCallSuccessMessage(string phoneNumber)
     {
-        // Wait for the first message to complete (3 seconds)
-        yield return new WaitForSeconds(3f);
+        // Wait for the first message to complete (15 seconds)
+        yield return new WaitForSeconds(15f);
 
-        // Show success message (MessageQueue will automatically display it after first message finishes)
-        Debug.Log($"GameManager: Showing success message for call to {phoneNumber}");
-        ShowBonusMessage($"CALL CONNECTED! +500 POINTS", duration: 3f);
-        AddScore(500);
+        // DON'T show success message - coroutines persist even when you change carousel items
+        // The phone messages should only appear when emitted, not from delayed coroutines
 
         // Clear the coroutine reference
         activeCallCoroutine = null;
-        Debug.Log($"GameManager: Call to {phoneNumber} successful!");
+        Debug.Log($"GameManager: Call coroutine finished (NOT showing success message)");
     }
 }

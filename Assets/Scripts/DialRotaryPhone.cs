@@ -167,12 +167,6 @@ public class DialRotaryPhone : MonoBehaviour
 
                 if (IsTouchingDial(touchPosition))
                 {
-                    // Hide/accelerate bonus message on dial touch
-                    if (GameManager.Instance != null)
-                    {
-                        GameManager.Instance.HideBonusMessage();
-                    }
-
                     isDragging = true;
                     IsDialActive = true;
                     lastMousePosition = touchPosition;
@@ -214,12 +208,6 @@ public class DialRotaryPhone : MonoBehaviour
                     if (IsTouchingDial(mousePosition))
                     {
                         Debug.Log($"*** TOUCHING DIAL - calling GetDigitFromPosition ***");
-
-                        // Hide/accelerate bonus message on dial click
-                        if (GameManager.Instance != null)
-                        {
-                            GameManager.Instance.HideBonusMessage();
-                        }
 
                         isDragging = true;
                         IsDialActive = true;
@@ -472,36 +460,32 @@ public class DialRotaryPhone : MonoBehaviour
 
     void UpdatePhoneNumberVisibility()
     {
-        if (phoneNumberText == null) return;
+        if (phoneNumberText == null)
+        {
+            Debug.LogWarning($"DialRotaryPhone [{gameObject.name}]: phoneNumberText is NULL!");
+            return;
+        }
 
         // Only show phone number text when this dial's wrapper is centered
         if (carousel != null && myCarouselWrapper != null)
         {
-            // Don't update visibility while carousel is moving - prevents flickering
-            if (carousel.IsCarouselMoving())
-            {
-                return;
-            }
-
             GameObject centeredObject = carousel.GetCenteredObject();
             bool isCentered = (centeredObject == myCarouselWrapper);
 
-            // Only update if the centered state has changed
-            if (isCentered != lastCenteredState)
-            {
-                phoneNumberText.gameObject.SetActive(isCentered);
-                lastCenteredState = isCentered;
-                Debug.Log($"DialRotaryPhone: Phone number text visibility changed to {isCentered}");
-            }
+            Debug.Log($"DialRotaryPhone [{gameObject.name}]: phoneNumberText='{phoneNumberText.gameObject.name}', currentlyActive={phoneNumberText.gameObject.activeSelf}, shouldBeCentered={isCentered}, CenteredObj={centeredObject?.name}, MyWrapper={myCarouselWrapper?.name}");
+
+            // Always update visibility based on centered state
+            phoneNumberText.gameObject.SetActive(isCentered);
+            lastCenteredState = isCentered;
+
+            Debug.Log($"DialRotaryPhone [{gameObject.name}]: Set phoneNumberText.gameObject.SetActive({isCentered}) - now active={phoneNumberText.gameObject.activeSelf}");
         }
         else
         {
-            // If we can't find the carousel, just show it by default (only once)
-            if (!lastCenteredState)
-            {
-                phoneNumberText.gameObject.SetActive(true);
-                lastCenteredState = true;
-            }
+            Debug.LogWarning($"DialRotaryPhone [{gameObject.name}]: carousel={carousel?.name ?? "NULL"}, myCarouselWrapper={myCarouselWrapper?.name ?? "NULL"} - hiding by default");
+            // If we can't find the carousel, hide it by default
+            phoneNumberText.gameObject.SetActive(false);
+            lastCenteredState = false;
         }
     }
 
