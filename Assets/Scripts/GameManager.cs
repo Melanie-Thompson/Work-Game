@@ -140,12 +140,21 @@ public class GameManager : MonoBehaviour
             Debug.LogWarning("GameManager: No MessageDisplayHandler found! Creating on separate GameObject...");
             GameObject handlerObj = new GameObject("MessageDisplayHandler");
             handler = handlerObj.AddComponent<MessageDisplayHandler>();
-            handler.messageUIObject = bonusMessageObject;
-            handler.messageText = bonusMessageObject.GetComponent<TextMeshProUGUI>();
+
+            // Set the prefab reference (bonusMessageObject will be used as the prefab)
+            handler.messageUIPrefab = bonusMessageObject;
+
+            // Set the parent to the canvas that contains the bonus message
+            if (bonusMessageObject.transform.parent != null)
+            {
+                handler.messageParent = bonusMessageObject.transform.parent;
+                Debug.Log($"GameManager: Set messageParent to {handler.messageParent.name}");
+            }
+
             handler.messageStartY = bonusMessageStartY;
             handler.riseSpeed = bonusMessageRiseSpeed;
             handler.destroyHeight = bonusMessageDestroyHeight;
-            Debug.Log($"GameManager: MessageDisplayHandler created - messageUIObject={bonusMessageObject.name}, startY={bonusMessageStartY}, riseSpeed={bonusMessageRiseSpeed}, destroyHeight={bonusMessageDestroyHeight}");
+            Debug.Log($"GameManager: MessageDisplayHandler created - messageUIPrefab={bonusMessageObject.name}, startY={bonusMessageStartY}, riseSpeed={bonusMessageRiseSpeed}, destroyHeight={bonusMessageDestroyHeight}");
         }
         else if (handler != null)
         {
@@ -557,45 +566,24 @@ public class GameManager : MonoBehaviour
 
     public void HideBonusMessage()
     {
-        Debug.Log("=== HideBonusMessage called - HIDING current message only (keeping queue) ===");
+        Debug.Log("=== HideBonusMessage called - ACCELERATING all visible messages 5x and skipping queue ===");
 
-        // Hide the message UI immediately
-        if (bonusMessageObject != null && bonusMessageObject.activeSelf)
+        // Accelerate ALL currently visible messages by 5x
+        MessageDisplayHandler handler = FindFirstObjectByType<MessageDisplayHandler>();
+        if (handler != null)
         {
-            bonusMessageObject.SetActive(false);
-            Debug.Log("GameManager: BonusMessage hidden immediately");
-        }
-
-        // Skip ONLY the currently displaying message, but keep queued messages
-        // This allows important messages (like rabbit hits) to still show after interaction
-        if (MessageQueue.Instance != null)
-        {
-            Debug.Log("GameManager: Skipping current message (keeping queue intact)");
-            MessageQueue.Instance.SkipCurrentMessage(); // Skip current message only
+            handler.AccelerateAllMessages();
+            Debug.Log("GameManager: Called AccelerateAllMessages()");
         }
         else
         {
-            Debug.LogWarning("GameManager: MessageQueue.Instance is null! Using fallback system.");
-
-            // Legacy fallback system - hide current message but keep queue
-            if (isShowingBonusMessage)
-            {
-                HideBonusMessageImmediate();
-                isShowingBonusMessage = false;
-                currentMessageTimer = 0f;
-                Debug.Log("GameManager: Hidden fallback message immediately");
-            }
-            // Don't clear the queue - let messages continue
+            Debug.LogError("GameManager: Could not find MessageDisplayHandler!");
         }
 
-        // Stop any pending bonus message coroutine (for legacy support)
-        if (bonusMessageCoroutine != null)
+        // Skip the current message in the queue so next one can display
+        if (MessageQueue.Instance != null)
         {
-            StopCoroutine(bonusMessageCoroutine);
-            bonusMessageCoroutine = null;
-            bonusMessageStartTime = -999f;
-            bonusMessageDuration = 0f;
-            Debug.Log("GameManager: Stopped pending bonus message coroutine");
+            MessageQueue.Instance.SkipCurrentMessage();
         }
     }
 

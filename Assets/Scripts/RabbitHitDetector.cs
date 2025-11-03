@@ -133,8 +133,8 @@ public class RabbitHitDetector : MonoBehaviour
         {
             GameManager.Instance.AddScore(500);
 
-            // Show message with shorter duration so it rises faster and disappears quickly
-            GameManager.Instance.ShowBonusMessage("RABBIT DOWN! +500 POINTS", duration: 1.5f, priority: 1);
+            // Show message with enough duration to reach top (2000px / 300px/s = 6.67s minimum)
+            GameManager.Instance.ShowBonusMessage("RABBIT DOWN! +500 POINTS", duration: 8f, priority: 1);
 
             Debug.Log("RabbitHitDetector: Awarded 500 points for hitting rabbit!");
         }

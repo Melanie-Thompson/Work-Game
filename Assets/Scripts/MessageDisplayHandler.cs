@@ -1,18 +1,20 @@
 using UnityEngine;
 using TMPro;
+using System.Collections.Generic;
 
 /// <summary>
 /// Handles the visual display of messages from the MessageQueue.
-/// Listens to MessageQueue events and controls the UI elements.
+/// Listens to MessageQueue events and creates instances of messages that rise up the screen.
+/// Each message is a separate GameObject that rises independently.
 /// </summary>
 public class MessageDisplayHandler : MonoBehaviour
 {
     [Header("UI References")]
-    [Tooltip("The GameObject containing the message UI (will be shown/hidden)")]
-    public GameObject messageUIObject;
+    [Tooltip("The prefab to instantiate for each message")]
+    public GameObject messageUIPrefab;
 
-    [Tooltip("The TextMeshPro component to display the message text")]
-    public TextMeshProUGUI messageText;
+    [Tooltip("The parent canvas/transform to spawn messages under")]
+    public Transform messageParent;
 
     [Header("Display Settings")]
     [Tooltip("Starting Y position for the message")]
@@ -26,6 +28,9 @@ public class MessageDisplayHandler : MonoBehaviour
 
     [Tooltip("Height at which message disappears")]
     public float destroyHeight = 2000f;
+
+    // Track all active message instances
+    private List<GameObject> activeMessages = new List<GameObject>();
 
     void Start()
     {
@@ -41,15 +46,16 @@ public class MessageDisplayHandler : MonoBehaviour
             Debug.LogError("MessageDisplayHandler: MessageQueue.Instance is null!");
         }
 
-        // Hide message UI initially
-        if (messageUIObject != null)
+        // Validate references
+        if (messageUIPrefab == null)
         {
-            messageUIObject.SetActive(false);
-            Debug.Log("MessageDisplayHandler: Message UI hidden at startup");
+            Debug.LogError("MessageDisplayHandler: messageUIPrefab is not assigned!");
         }
-        else
+
+        if (messageParent == null)
         {
-            Debug.LogError("MessageDisplayHandler: messageUIObject is not assigned!");
+            Debug.LogWarning("MessageDisplayHandler: messageParent is not assigned, will use this GameObject's transform");
+            messageParent = transform;
         }
     }
 
@@ -62,77 +68,123 @@ public class MessageDisplayHandler : MonoBehaviour
             MessageQueue.Instance.OnMessageDisplayEnd -= OnMessageEnd;
             Debug.Log("MessageDisplayHandler: Unsubscribed from MessageQueue events");
         }
+
+        // Clean up any remaining message instances
+        foreach (GameObject msg in activeMessages)
+        {
+            if (msg != null)
+            {
+                Destroy(msg);
+            }
+        }
+        activeMessages.Clear();
     }
 
     /// <summary>
-    /// Called when a message starts displaying
+    /// Called when a message starts displaying - creates a new instance
     /// </summary>
     private void OnMessageStart(string message)
     {
-        Debug.LogWarning($"MessageDisplayHandler: === DISPLAYING MESSAGE === '{message}'");
+        Debug.LogWarning($"MessageDisplayHandler: === CREATING NEW MESSAGE === '{message}'");
 
-        if (messageUIObject == null || messageText == null)
+        if (messageUIPrefab == null)
         {
-            Debug.LogError("MessageDisplayHandler: Missing UI references!");
+            Debug.LogError("MessageDisplayHandler: messageUIPrefab is null!");
             return;
         }
 
-        // Reset position to starting Y
-        RectTransform rectTransform = messageUIObject.GetComponent<RectTransform>();
+        // Instantiate a new message instance
+        GameObject messageInstance = Instantiate(messageUIPrefab, messageParent);
+        activeMessages.Add(messageInstance);
+        Debug.Log($"MessageDisplayHandler: Instantiated new message, total active: {activeMessages.Count}");
+
+        // Get the RectTransform and set starting position
+        RectTransform rectTransform = messageInstance.GetComponent<RectTransform>();
         if (rectTransform != null)
         {
             Vector2 anchoredPos = rectTransform.anchoredPosition;
             anchoredPos.y = messageStartY;
             rectTransform.anchoredPosition = anchoredPos;
-            Debug.Log($"MessageDisplayHandler: Reset anchoredPosition to y={messageStartY}");
+            Debug.Log($"MessageDisplayHandler: Set anchoredPosition to y={messageStartY}");
         }
 
-        // Don't override RetroArcadeText settings - let Inspector values be used
-        var retroText = messageUIObject.GetComponent<RetroArcadeText>();
-        if (retroText != null)
+        // Set the text
+        TextMeshProUGUI messageText = messageInstance.GetComponent<TextMeshProUGUI>();
+        if (messageText != null)
         {
-            // Reset rise speed to default value (in case it was accelerated)
-            retroText.riseSpeed = riseSpeed;
-            Debug.Log($"MessageDisplayHandler: RetroArcadeText - riseSpeed reset to {retroText.riseSpeed}, destroyHeight={retroText.destroyHeight}");
+            messageText.text = message;
+            Debug.Log($"MessageDisplayHandler: Set text to '{message}'");
         }
         else
         {
-            Debug.LogWarning("MessageDisplayHandler: No RetroArcadeText component found on messageUIObject!");
+            Debug.LogError("MessageDisplayHandler: No TextMeshProUGUI component on instantiated message!");
         }
 
-        // Update text - THIS IS CRITICAL
-        Debug.LogWarning($"MessageDisplayHandler: BEFORE setting text, messageText.text = '{messageText.text}'");
-        messageText.text = message;
-        Debug.LogWarning($"MessageDisplayHandler: AFTER setting text, messageText.text = '{messageText.text}'");
+        // Configure RetroArcadeText component
+        var retroText = messageInstance.GetComponent<RetroArcadeText>();
+        if (retroText != null)
+        {
+            retroText.riseSpeed = riseSpeed;
+            retroText.destroyHeight = destroyHeight;
+            Debug.Log($"MessageDisplayHandler: RetroArcadeText configured - riseSpeed={riseSpeed}, destroyHeight={destroyHeight}");
+        }
+        else
+        {
+            Debug.LogWarning("MessageDisplayHandler: No RetroArcadeText component on instantiated message!");
+        }
 
-        // Show the UI
-        messageUIObject.SetActive(true);
-        Debug.Log($"MessageDisplayHandler: Message UI activated");
+        // Activate the message
+        messageInstance.SetActive(true);
+        Debug.Log($"MessageDisplayHandler: Message instance activated");
     }
 
     /// <summary>
-    /// Called when a message finishes displaying
+    /// Called when a message finishes displaying - this just marks it as done in the queue
+    /// The actual message GameObject will destroy itself when it reaches destroyHeight
     /// </summary>
     private void OnMessageEnd(string message)
     {
-        Debug.Log($"MessageDisplayHandler: Hiding message - '{message}'");
+        Debug.Log($"MessageDisplayHandler: Message finished in queue - '{message}'");
+        // Don't destroy anything here - let RetroArcadeText handle it when it reaches destroyHeight
+    }
 
-        if (messageUIObject != null)
+    /// <summary>
+    /// Accelerate all currently visible messages by 5x
+    /// </summary>
+    public void AccelerateAllMessages()
+    {
+        Debug.Log($"MessageDisplayHandler: Accelerating {activeMessages.Count} active messages by 5x");
+
+        // Remove null entries (messages that have already been destroyed)
+        activeMessages.RemoveAll(msg => msg == null);
+
+        foreach (GameObject messageObj in activeMessages)
         {
-            messageUIObject.SetActive(false);
-            Debug.Log("MessageDisplayHandler: Message UI hidden");
+            var retroText = messageObj.GetComponent<RetroArcadeText>();
+            if (retroText != null)
+            {
+                retroText.riseSpeed = retroText.riseSpeed * 5f;
+                Debug.Log($"MessageDisplayHandler: Accelerated message to {retroText.riseSpeed} px/s");
+            }
         }
     }
 
     /// <summary>
-    /// Manually hide the message (useful for external systems)
+    /// Clean up destroyed messages from the active list
     /// </summary>
-    public void HideMessage()
+    void Update()
     {
-        if (messageUIObject != null && messageUIObject.activeSelf)
+        // Clean up null references every second
+        if (Time.frameCount % 60 == 0)
         {
-            messageUIObject.SetActive(false);
-            Debug.Log("MessageDisplayHandler: Message UI manually hidden");
+            int beforeCount = activeMessages.Count;
+            activeMessages.RemoveAll(msg => msg == null);
+            int afterCount = activeMessages.Count;
+
+            if (beforeCount != afterCount)
+            {
+                Debug.Log($"MessageDisplayHandler: Cleaned up {beforeCount - afterCount} destroyed messages, {afterCount} still active");
+            }
         }
     }
 }
