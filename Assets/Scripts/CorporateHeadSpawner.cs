@@ -316,6 +316,13 @@ public class CorporateHeadSpawner : MonoBehaviour
                 Debug.Log("CorporateHeadSpawner: Hidden speech bubble");
             }
 
+            // Also hide the text
+            if (mapping.speechBubbleText != null)
+            {
+                mapping.speechBubbleText.gameObject.SetActive(false);
+                Debug.Log("CorporateHeadSpawner: Hidden speech bubble text");
+            }
+
             // Mark dialogue as inactive so hang-up icon can be shown
             DialRotaryPhone.IsDialogueActive = false;
 
