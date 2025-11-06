@@ -113,6 +113,18 @@ public class MyLever : MonoBehaviour
     
     void Update()
     {
+        // Check if dialogue is active - block all lever input
+        if (DialRotaryPhone.IsDialogueActive)
+        {
+            if (dragging)
+            {
+                Debug.LogWarning($"Lever '{gameObject.name}': BLOCKED - Dialogue active! Releasing drag.");
+                dragging = false;
+                IsAnyLeverActive = false;
+            }
+            return;
+        }
+
         // Check if work shift is complete - if so, block ALL input
         if (GameManager.Instance != null && GameManager.Instance.IsWorkShiftComplete())
         {

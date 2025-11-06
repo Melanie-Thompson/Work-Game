@@ -121,6 +121,24 @@ public class PhoneIconClick : MonoBehaviour, IPointerClickHandler
         }
 
         Debug.Log("=== PhoneIconClick: Phone icon clicked! ===");
+
+        // Check if we're hanging up or making a call
+        if (DialRotaryPhone.IsCallInProgress)
+        {
+            // Hang up the call
+            Debug.Log("PhoneIconClick: Hanging up call");
+            OnHangUpClicked();
+        }
+        else
+        {
+            // Make a new call
+            Debug.Log("PhoneIconClick: Making call");
+            OnCallClicked();
+        }
+    }
+
+    void OnCallClicked()
+    {
         Debug.Log($"PhoneIconClick: Starting wobble - angle:{wobbleAngle}, speed:{wobbleSpeed}, axis:{wobbleAxis}");
         Debug.Log($"PhoneIconClick: Original rotation: {transform.localRotation.eulerAngles}");
 
@@ -141,6 +159,13 @@ public class PhoneIconClick : MonoBehaviour, IPointerClickHandler
             Debug.LogError("PhoneIconClick: No DialRotaryPhone reference!");
         }
 
+        // IMMEDIATELY hide this phone call icon (it's the one that was just clicked)
+        gameObject.SetActive(false);
+        Debug.Log("PhoneIconClick: Hidden phone call icon immediately");
+
+        // Start the call
+        DialRotaryPhone.StartCall();
+
         // Fire event to GameManager
         if (GameManager.Instance != null)
         {
@@ -150,9 +175,41 @@ public class PhoneIconClick : MonoBehaviour, IPointerClickHandler
         {
             Debug.LogError("PhoneIconClick: GameManager.Instance is null!");
         }
+    }
 
-        // Reset the phone number after wobble/ring completes (delayed)
-        StartCoroutine(ResetPhoneNumberAfterRing());
+    void OnHangUpClicked()
+    {
+        Debug.Log("PhoneIconClick: Hang up clicked!");
+
+        // Start wobble for hang-up
+        isWobbling = true;
+        wobbleTimer = 0f;
+        originalRotation = transform.localRotation;
+
+        // End the call
+        DialRotaryPhone.EndCall();
+
+        // Get the phone number before clearing it (so we know which Corporate Head to hide)
+        string phoneNumber = "";
+        if (dialPhone != null)
+        {
+            phoneNumber = dialPhone.GetPhoneNumber();
+            dialPhone.ClearPhoneNumber();
+            Debug.Log($"PhoneIconClick: Phone number '{phoneNumber}' cleared after hang-up");
+        }
+
+        // Hide the Corporate Head associated with this phone number
+        if (GameManager.Instance != null)
+        {
+            if (GameManager.Instance.corporateHeadSpawner != null)
+            {
+                GameManager.Instance.corporateHeadSpawner.HideCorporateHead(phoneNumber);
+                Debug.Log($"PhoneIconClick: Hiding Corporate Head for {phoneNumber}");
+            }
+
+            // Show a message
+            GameManager.Instance.ShowBonusMessage("HUNG UP!", duration: 2f, priority: 5);
+        }
     }
 
     private System.Collections.IEnumerator ResetPhoneNumberAfterRing()

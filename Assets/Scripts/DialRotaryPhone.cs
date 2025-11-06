@@ -19,8 +19,11 @@ public class DialRotaryPhone : MonoBehaviour
     [Tooltip("TextMeshPro component to display the phone number")]
     public TMP_Text phoneNumberText;
 
-    [Tooltip("GameObject containing the phone icon (will be shown/hidden based on carousel position)")]
-    public GameObject phoneIcon;
+    [Tooltip("GameObject containing the phone call icon (will be shown when number is ready to dial)")]
+    public GameObject phoneCallIcon;
+
+    [Tooltip("GameObject containing the phone hang-up icon (will be shown when call is in progress)")]
+    public GameObject phoneHangUpIcon;
 
     [Tooltip("Maximum number of digits (not including the # prefix)")]
     public int maxDigits = 3;
@@ -36,6 +39,12 @@ public class DialRotaryPhone : MonoBehaviour
 
     // Static flag to tell other scripts that dial is being used
     public static bool IsDialActive { get; private set; } = false;
+
+    // Static flag to track if a call is currently in progress
+    public static bool IsCallInProgress { get; private set; } = false;
+
+    // Static flag to track if dialogue is currently being shown (prevents hang-up icon from showing)
+    public static bool IsDialogueActive { get; set; } = false;
 
     private bool isDragging = false;
     private Vector3 originalRotation;
@@ -108,6 +117,17 @@ public class DialRotaryPhone : MonoBehaviour
 
     void Update()
     {
+        // Check if dialogue is active - block dial input (but allow phone icon clicks)
+        if (IsDialogueActive)
+        {
+            if (isDragging)
+            {
+                isDragging = false;
+                IsDialActive = false;
+            }
+            // Don't return - allow phone icon visibility update
+        }
+
         // Check if work shift is complete - if so, block ALL input
         if (GameManager.Instance != null && GameManager.Instance.IsWorkShiftComplete())
         {
@@ -153,6 +173,12 @@ public class DialRotaryPhone : MonoBehaviour
 
     void HandleInput()
     {
+        // Block dial input if dialogue is active
+        if (IsDialogueActive)
+        {
+            return;
+        }
+
         bool inputHandled = false;
 
         // Try touch input first (mobile)
@@ -436,6 +462,21 @@ public class DialRotaryPhone : MonoBehaviour
         return phoneNumberText != null ? phoneNumberText.text : "";
     }
 
+    // Public method to start a call (called by PhoneIconClick)
+    public static void StartCall()
+    {
+        IsCallInProgress = true;
+        Debug.Log("DialRotaryPhone: Call started");
+    }
+
+    // Public method to end a call (called by PhoneIconClick when hanging up)
+    public static void EndCall()
+    {
+        IsCallInProgress = false;
+        IsDialogueActive = false; // Reset dialogue flag when call ends
+        Debug.Log("DialRotaryPhone: Call ended");
+    }
+
     GameObject FindMyCarouselWrapper()
     {
         // Walk up the parent hierarchy and check if any parent is in the carousel's object array
@@ -491,9 +532,7 @@ public class DialRotaryPhone : MonoBehaviour
 
     void UpdatePhoneIconVisibility()
     {
-        if (phoneIcon == null) return;
-
-        // Only show phone icon when this dial's wrapper is centered AND we have max digits
+        // Only show phone icons when this dial's wrapper is centered AND we have max digits
         if (carousel != null && myCarouselWrapper != null)
         {
             // Don't update visibility while carousel is moving - prevents flickering
@@ -509,14 +548,37 @@ public class DialRotaryPhone : MonoBehaviour
             int currentDigitCount = phoneNumberText != null ? phoneNumberText.text.Length - 1 : 0;
             bool hasFullNumber = currentDigitCount >= maxDigits;
 
-            // Show icon only when centered AND has full phone number
-            bool shouldShow = isCentered && hasFullNumber;
-            phoneIcon.SetActive(shouldShow);
+            // Show icons only when centered AND has full phone number
+            bool shouldShowIcons = isCentered && hasFullNumber;
+
+            // Show the appropriate icon based on call state
+            if (shouldShowIcons)
+            {
+                if (IsCallInProgress)
+                {
+                    // Only show hang-up icon if dialogue is NOT active
+                    if (phoneCallIcon != null) phoneCallIcon.SetActive(false);
+                    if (phoneHangUpIcon != null) phoneHangUpIcon.SetActive(!IsDialogueActive);
+                }
+                else
+                {
+                    // Show call icon when ready to dial
+                    if (phoneCallIcon != null) phoneCallIcon.SetActive(true);
+                    if (phoneHangUpIcon != null) phoneHangUpIcon.SetActive(false);
+                }
+            }
+            else
+            {
+                // Hide both icons
+                if (phoneCallIcon != null) phoneCallIcon.SetActive(false);
+                if (phoneHangUpIcon != null) phoneHangUpIcon.SetActive(false);
+            }
         }
         else
         {
-            // If we can't find the carousel, hide by default
-            phoneIcon.SetActive(false);
+            // If we can't find the carousel, hide both icons by default
+            if (phoneCallIcon != null) phoneCallIcon.SetActive(false);
+            if (phoneHangUpIcon != null) phoneHangUpIcon.SetActive(false);
         }
     }
 }

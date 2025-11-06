@@ -13,6 +13,7 @@ public class GameManager : MonoBehaviour
     public GameObject emailCanvas; // Reference to Email Canvas
     public TextMeshProUGUI emailCountText; // Reference to Email Count UI text
     public TextMeshProUGUI priorityEmailCountText; // Reference to Priority Email Count UI text
+    public CorporateHeadSpawner corporateHeadSpawner; // Reference to Corporate Head Spawner
 
     [Header("Bonus Message Settings")]
     public float bonusMessageStartY = -200f; // Starting Y position for bonus message
@@ -758,6 +759,16 @@ public class GameManager : MonoBehaviour
 
         // Show success message immediately after in queue
         ShowBonusMessage($"CALL CONNECTED! +500 POINTS", duration: 15f);
+
+        // Check if this phone number triggers a Corporate Head spawn
+        if (corporateHeadSpawner != null)
+        {
+            corporateHeadSpawner.OnPhoneNumberCalled(phoneNumber);
+        }
+        else
+        {
+            Debug.LogWarning("GameManager: CorporateHeadSpawner is not assigned!");
+        }
 
         // TODO: Add logic to check if this is the correct number for current story point
         // TODO: Trigger story events, play sounds, etc.
